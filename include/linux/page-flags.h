@@ -113,9 +113,16 @@ enum pageflags {
 	PG_scfslower,
 	PG_nocache,
 #endif
+#ifdef CONFIG_KSM_CHECK_PAGE
+	PG_ksm_scan0,		/* page has been scanned by even KSM cycle */
+#endif
 	PG_readahead,		/* page in a readahead window */
 	__NR_PAGEFLAGS,
 
+#ifdef CONFIG_KSM_CHECK_PAGE
+	/* page has been scanned by odd KSM cycle */
+	PG_ksm_scan1 = PG_owner_priv_1,
+#endif
 	/* Filesystems */
 	PG_checked = PG_owner_priv_1,
 
@@ -226,6 +233,10 @@ PAGEFLAG(Private, private) __SETPAGEFLAG(Private, private)
 PAGEFLAG(Private2, private_2) TESTSCFLAG(Private2, private_2)
 PAGEFLAG(OwnerPriv1, owner_priv_1) TESTCLEARFLAG(OwnerPriv1, owner_priv_1)
 
+#ifdef CONFIG_KSM_CHECK_PAGE
+CLEARPAGEFLAG(KsmScan0, ksm_scan0) TESTSETFLAG(KsmScan0, ksm_scan0)
+CLEARPAGEFLAG(KsmScan1, ksm_scan1) TESTSETFLAG(KsmScan1, ksm_scan1)
+#endif
 /*
  * Only test-and-set exist for PG_writeback.  The unconditional operators are
  * risky: they bypass page accounting.
