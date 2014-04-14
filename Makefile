@@ -753,6 +753,8 @@ ifeq ($(CONFIG_TIMA),y)
 endif
 endif
 
+include $(srctree)/scripts/Makefile.extrawarn
+
 # Add user supplied CPPFLAGS, AFLAGS and CFLAGS as the last assignments
 KBUILD_CPPFLAGS += $(KCPPFLAGS)
 KBUILD_AFLAGS += $(KAFLAGS)
