@@ -34,6 +34,9 @@
 #include "logger.h"
 #include <linux/sec_bsp.h>
 
+#ifdef CONFIG_POWERSUSPEND
+#include <linux/powersuspend.h>
+#endif
 #include <asm/ioctls.h>
 
 #ifdef CONFIG_SEC_DEBUG
@@ -51,6 +54,14 @@
 #define SZ_LOGGER_BUF_EVENTS 256*1024
 #define SZ_LOGGER_BUF_SYSTEM 256*1024
 
+#ifdef CONFIG_POWERSUSPEND
+/*
+ * 0 - Enabled, 1 - Auto Suspend, 2 - Disabled
+ */
+static unsigned int log_mode = 2; // Disabled by default
+static unsigned int log_enabled = 1; // Do not change this value
+module_param(log_mode, uint, S_IWUSR | S_IRUGO);
+#endif
 
 /**
  * struct logger_log - represents a specific log, such as 'main' or 'radio'
@@ -596,6 +607,26 @@ static ssize_t do_write_log_from_user(struct logger_log *log,
 	return count;
 }
 
+#ifdef CONFIG_POWERSUSPEND
+static void log_suspend(struct power_suspend *handler)
+
+{
+	if (log_mode == 1)
+		log_enabled = 0;
+}
+
+static void log_resume(struct power_suspend *handler)
+
+{
+	log_enabled = 1;
+}
+
+static struct power_suspend log_power_suspend = {
+	.suspend = log_suspend,
+	.resume = log_resume,
+};
+#endif
+
 /*
  * logger_aio_write - our write method, implementing support for write(),
  * writev(), and aio_write(). Writes are our fast path, and we try to optimize
@@ -604,12 +635,17 @@ static ssize_t do_write_log_from_user(struct logger_log *log,
 static ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 			 unsigned long nr_segs, loff_t ppos)
 {
-	struct logger_log *log = file_get_log(iocb->ki_filp);
-	size_t orig;
+	struct logger_log *log;
+	size_t orig, ret = 0;
 	struct logger_entry header;
 	struct timespec now;
-	ssize_t ret = 0;
 
+#ifdef CONFIG_POWERSUSPEND
+	if (!log_enabled || log_mode == 2)
+		return 0;
+#endif
+
+	log = file_get_log(iocb->ki_filp);
 	now = current_kernel_time();
 
 	header.pid = current->tgid;
@@ -1124,6 +1160,10 @@ static int __init logger_init(void)
 {
 	int ret;
 
+#ifdef CONFIG_POWERSUSPEND
+	register_power_suspend(&log_power_suspend);
+#endif
+
 	ret = create_log(LOGGER_LOG_MAIN, SZ_LOGGER_BUF_MAIN);
 	if (unlikely(ret))
 		goto out;
@@ -1168,8 +1208,11 @@ static void __exit logger_exit(void)
 		kfree(current_log);
 	}
 #endif /* SUPPORT_GETLOG_TOOL */
-}
 
+#ifdef CONFIG_POWERSUSPEND
+	unregister_power_suspend(&log_power_suspend);
+#endif
+}
 
 device_initcall(logger_init);
 module_exit(logger_exit);
