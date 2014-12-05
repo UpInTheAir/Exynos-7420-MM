@@ -77,6 +77,9 @@ static int last_max = -1;
 static DEFINE_RWLOCK(cpufreq_driver_lock);
 static DEFINE_MUTEX(cpufreq_governor_lock);
 
+#define GOVERNOR_NAME_MAX	16
+static char governor_hard[4][GOVERNOR_NAME_MAX];
+
 /*
  * cpu_policy_rwsem is a per CPU reader-writer semaphore designed to cure
  * all cpufreq/hotplug/workqueue/etc related lock issues.
@@ -473,6 +476,26 @@ static ssize_t store_##file_name					\
 	return ret ? ret : count;					\
 }
 
+/**
+ * show_scaling_governor_hard - scaling governor hard lock
+ */
+static ssize_t show_scaling_governor_hard(struct cpufreq_policy *policy, char *buf)
+{							\
+	return sprintf(buf, "%s\n", governor_hard[policy->cpu]);
+}
+
+
+/**
+ * store_scaling_governor_hard - scaling governor hard lock
+ */
+static ssize_t store_scaling_governor_hard(struct cpufreq_policy *policy, const char *buf, size_t count)
+{
+	if (strlen(buf) < GOVERNOR_NAME_MAX)
+		sscanf(buf, "%s", governor_hard[policy->cpu]);
+
+	return count;
+}
+
 static void __cpuinit set_cpu_min_max_work_fn(struct work_struct *work)
 {
 	struct hotplug_data *data = container_of(work, struct hotplug_data, hotplug_work);
@@ -660,6 +683,13 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	ret = sscanf(buf, "%15s", str_governor);
 	if (ret != 1)
 		return -EINVAL;
+
+	// if hard limit for governor is set, only allow this governor to be set
+	if ((strlen(governor_hard[policy->cpu]) != 0) && (! strstr(str_governor, governor_hard[policy->cpu])))
+	{
+		printk(KERN_ERR "scaling governor: switch to %s failed due to Boeffla hard value set to %s\n", str_governor, governor_hard[policy->cpu]);
+		return -EINVAL;
+	}
 
 	if (cpufreq_parse_governor(str_governor, &new_policy.policy,
 						&new_policy.governor))
@@ -961,6 +991,7 @@ cpufreq_freq_attr_rw(scaling_min_freq_kt);
 cpufreq_freq_attr_rw(ren_max_freq);
 cpufreq_freq_attr_rw(scaling_max_freq_kt);
 cpufreq_freq_attr_rw(scaling_governor);
+cpufreq_freq_attr_rw(scaling_governor_hard);
 cpufreq_freq_attr_rw(scaling_setspeed);
 cpufreq_freq_attr_rw(freq_lock);
 cpufreq_freq_attr_rw(screen_off_scaling_enable);
@@ -978,6 +1009,7 @@ static struct attribute *default_attrs[] = {
 	&affected_cpus.attr,
 	&related_cpus.attr,
 	&scaling_governor.attr,
+	&scaling_governor_hard.attr,
 	&scaling_driver.attr,
 	&scaling_available_governors.attr,
 	&scaling_setspeed.attr,
