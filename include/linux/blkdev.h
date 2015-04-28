@@ -450,6 +450,7 @@ struct request_queue {
 	struct throtl_data *td;
 #endif
 	struct rcu_head		rcu_head;
+	char elevator_hard[ELV_NAME_MAX];
 };
 
 #define QUEUE_FLAG_QUEUED	1	/* uses generic tag queueing */
