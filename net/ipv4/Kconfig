@@ -601,6 +601,22 @@ config TCP_CONG_WVEGAS
 	wVegas congestion control for MPTCP
 	To enable it, just put 'wvegas' in tcp_congestion_control
 
+config TCP_CONG_CDG
+	tristate "CAIA Delay-Gradient (CDG)"
+	default n
+	---help---
+	CAIA Delay-Gradient (CDG) is a TCP congestion control that modifies
+	the TCP sender in order to:
+
+	  o Use the delay gradient as a congestion signal.
+	  o Back off with an average probability that is independent of the RTT.
+	  o Coexist with flows that use loss-based congestion control.
+	  o Tolerate packet loss unrelated to congestion.
+
+	For further details see:
+	  D.A. Hayes and G. Armitage. "Revisiting TCP congestion control using
+	  delay gradients." In Networking 2011. Preprint: http://goo.gl/No3vdg
+
 choice
 	prompt "Default TCP congestion control"
 	default DEFAULT_CUBIC
@@ -638,6 +654,9 @@ choice
 	config DEFAULT_WVEGAS
 		bool "Wvegas" if TCP_CONG_WVEGAS=y
 
+	config DEFAULT_DCTCP
+		bool "DCTCP" if TCP_CONG_DCTCP=y
+
 	config DEFAULT_RENO
 		bool "Reno"
 
@@ -661,6 +680,7 @@ config DEFAULT_TCP_CONG
 	default "veno" if DEFAULT_VENO
 	default "lia" if DEFAULT_LIA
 	default "wvegas" if DEFAULT_WVEGAS
+	default "cdg" if DEFAULT_CDG
 	default "reno" if DEFAULT_RENO
 	default "cubic"
 
