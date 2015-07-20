@@ -1584,20 +1584,20 @@ static inline void __update_group_entity_contrib(struct sched_entity *se) {}
  * tweaking suit particular needs.
  */
 
-unsigned int hmp_up_threshold = 700;
-unsigned int hmp_down_threshold = 256;
+static unsigned int hmp_up_threshold = 700;
+static unsigned int hmp_down_threshold = 256;
 
-unsigned int hmp_semiboost_up_threshold = 479;
-unsigned int hmp_semiboost_down_threshold = 150;
+static unsigned int hmp_semiboost_up_threshold = 479;
+static unsigned int hmp_semiboost_down_threshold = 150;
 
 /* Global switch between power-aware migrations and classical GTS. */
-unsigned int hmp_power_migration = 0;
+static unsigned int hmp_power_migration = 0;
 
 /* Performance threshold for guaranteeing an up migration. */
-unsigned int hmp_up_perf_threshold = 597;
+static unsigned int hmp_up_perf_threshold = 597;
 
 /* Capacity floor for checking cluster perf and efficiency. */
-unsigned int hmp_up_power_threshold = 341;
+static unsigned int hmp_up_power_threshold = 341;
 
 /*
  * Maximum total capacity difference in load scale percentage to enact scheduler power migration.
@@ -1605,8 +1605,8 @@ unsigned int hmp_up_power_threshold = 341;
  */
 #define UP_PERF_HYS_DEF		SCHED_LOAD_SCALE * 0.05
 #define DOWN_PERF_HYS_DEF	SCHED_LOAD_SCALE * 0.10
-unsigned int hmp_up_perf_hysteresis = UP_PERF_HYS_DEF;
-unsigned int hmp_down_perf_hysteresis = DOWN_PERF_HYS_DEF;
+static unsigned int hmp_up_perf_hysteresis = UP_PERF_HYS_DEF;
+static unsigned int hmp_down_perf_hysteresis = DOWN_PERF_HYS_DEF;
 
 #define NUM_CLUSTERS	2
 
