@@ -201,9 +201,9 @@ static int exynos7420_bus_table_CA57[CPUFREQ_LEVEL_END_CA57] = {
 	 543000,		/* 1.0 GHz */
 	 416000,		/* 900 MHz */
 	 416000,		/* 800 MHz */
-	      0,		/* 700 MHz */
-	      0,		/* 600 MHz */
-	      0,		/* 500 MHz */
+	 416000,		/* 700 MHz */
+	 416000,		/* 600 MHz */
+	 416000,		/* 500 MHz */
 	      0,		/* 400 MHz */
 	      0,		/* 300 MHz */
 	      0,		/* 200 MHz */
@@ -384,13 +384,13 @@ static void __init set_volt_table_CA57(void)
 	case 5 :
 		max_support_idx_CA57 = L10; break;	/* 1.5GHz */
 	default :
-		max_support_idx_CA57 = L4;		/* 2.1GHz */
+		max_support_idx_CA57 = L1;		/* 2.4GHz */
 	}
 #else
 	max_support_idx_CA57 = L13;	/* 1.2 GHz */
 #endif
 
-	min_support_idx_CA57 = L17;	/* 800 MHz */
+	min_support_idx_CA57 = L20;	/* 500 MHz */
 
 	pr_info("CPUFREQ of CA57 max_freq : L%d %u khz\n", max_support_idx_CA57,
 		exynos7420_freq_table_CA57[max_support_idx_CA57].frequency);
