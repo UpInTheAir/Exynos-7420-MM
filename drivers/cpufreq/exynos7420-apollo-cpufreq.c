@@ -158,9 +158,9 @@ static int exynos7420_bus_table_CA53[CPUFREQ_LEVEL_END_CA53] = {
 	 543000,		/* 700 MHz */
 	 416000,		/* 600 MHz */
 	 416000,		/* 500 MHz */
-	      0,		/* 400 MHz */
-	      0,		/* 300 MHz */
-	      0,		/* 200 MHz */
+	 416000,		/* 400 MHz */
+	 416000,		/* 300 MHz */
+	 416000,		/* 200 MHz */
 };
 #endif
 
@@ -304,7 +304,7 @@ static void __init set_volt_table_CA53(void)
 		max_support_idx_CA53 = L5;	/* 1.5GHz */
 	}
 
-	min_support_idx_CA53 = L16;	/* 400MHz */
+	min_support_idx_CA53 = L18;	/* 200MHz */
 	pr_info("CPUFREQ of CA53 max_freq : L%d %u khz\n", max_support_idx_CA53,
 		exynos7420_freq_table_CA53[max_support_idx_CA53].frequency);
 	pr_info("CPUFREQ of CA53 min_freq : L%d %u khz\n", min_support_idx_CA53,
