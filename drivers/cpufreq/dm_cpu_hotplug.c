@@ -30,6 +30,10 @@
 #include <linux/suspend.h>
 #include <linux/exynos-ss.h>
 
+#ifdef CONFIG_POWERSUSPEND
+#include <linux/powersuspend.h>
+#endif
+
 //#define DM_HOTPLUG_DEBUG
 
 #if defined(CONFIG_SOC_EXYNOS5430)
@@ -561,6 +565,9 @@ static int fb_state_change(struct notifier_block *nb,
 	switch (blank) {
 	case FB_BLANK_POWERDOWN:
 		lcd_is_on = false;
+#ifdef CONFIG_POWERSUSPEND
+		set_power_suspend_state_panel_hook(POWER_SUSPEND_ACTIVE);
+#endif
 		pr_info("LCD is off\n");
 		screen_is_on = false;
 
@@ -580,6 +587,9 @@ static int fb_state_change(struct notifier_block *nb,
 		 * turned on.
 		 */
 		lcd_is_on = true;
+#ifdef CONFIG_POWERSUSPEND
+		set_power_suspend_state_panel_hook(POWER_SUSPEND_INACTIVE);
+#endif
 		screen_is_on = true;
 		pr_info("LCD is on\n");
 
