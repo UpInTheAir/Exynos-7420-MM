@@ -1591,7 +1591,7 @@ unsigned int hmp_semiboost_up_threshold = 479;
 unsigned int hmp_semiboost_down_threshold = 150;
 
 /* Global switch between power-aware migrations and classical GTS. */
-unsigned int hmp_power_migration = 1;
+unsigned int hmp_power_migration = 0;
 
 /* Performance threshold for guaranteeing an up migration. */
 unsigned int hmp_up_perf_threshold = 597;
