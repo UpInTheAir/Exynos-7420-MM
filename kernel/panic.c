@@ -123,23 +123,12 @@ void panic(const char *fmt, ...)
 	printk(KERN_EMERG "Kernel panic - not syncing: %s\n",buf);
 
 	exynos_ss_prepare_panic();
-	exynos_ss_dump_panic();
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 	/*
 	 * Avoid nested stack-dumping if a panic occurs during oops processing
 	 */
 	if (!test_taint(TAINT_DIE) && oops_in_progress <= 1)
 		dump_stack();
-#endif
-
-#if defined(CONFIG_SOC_EXYNOS5422) || defined(CONFIG_SOC_EXYNOS5430)
-	show_exynos_pmu();
-#endif
-#if defined(CONFIG_SOC_EXYNOS5422) || defined(CONFIG_SOC_EXYNOS5430)
-	show_exynos_cmu();
-#endif
-#ifdef CONFIG_SCHED_DEBUG
-	sysrq_sched_debug_show();
 #endif
 
 	/*
@@ -157,8 +146,6 @@ void panic(const char *fmt, ...)
 	smp_send_stop();
 
 	kmsg_dump(KMSG_DUMP_PANIC);
-
-	exynos_cs_show_pcval();
 
 	atomic_notifier_call_chain(&panic_notifier_list, 0, buf);
 
