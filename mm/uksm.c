@@ -185,6 +185,7 @@ static int is_full_zero(const void *s1, size_t len)
 #define U64_MAX		(~((u64)0))
 #define UKSM_RUNG_ROUND_FINISHED  (1 << 0)
 #define TIME_RATIO_SCALE	10000
+#define SLEEP_MILLISECS		1000
 
 #define SLOT_TREE_NODE_SHIFT	8
 #define SLOT_TREE_NODE_STORE_SIZE	(1UL << SLOT_TREE_NODE_SHIFT)
@@ -4959,7 +4960,7 @@ static ssize_t sleep_millisecs_store(struct kobject *kobj,
 	if (msecs > MSEC_PER_SEC)
 		msecs = MSEC_PER_SEC;
 
-	uksm_sleep_jiffies = msecs_to_jiffies(msecs);
+	uksm_sleep_jiffies = msecs_to_jiffies(SLEEP_MILLISECS);
 
 	return count;
 }
