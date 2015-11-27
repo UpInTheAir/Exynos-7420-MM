@@ -44,6 +44,15 @@ module_param(enable_umts_ipc0_wl, bool, 0644);
 static bool enable_power_manager_service_wl = true;
 module_param(enable_power_manager_service_wl, bool, 0644);
 
+static bool enable_wlan_rx_wake_ws = true;
+module_param(enable_wlan_rx_wake_ws, bool, 0644);
+
+static bool enable_wlan_ctrl_wake_ws = true;
+module_param(enable_wlan_ctrl_wake_ws, bool, 0644);
+
+static bool enable_wlan_wake_ws = true;
+module_param(enable_wlan_wake_ws, bool, 0644);
+
 /*
  * If set, the suspend/hibernate code will abort transitions to a sleep state
  * if wakeup events are registered during or immediately before the transition.
@@ -598,6 +607,27 @@ static void wakeup_source_activate(struct wakeup_source *ws)
 		if (ws->active)
 			wakeup_source_deactivate(ws);
 			pr_info("wakeup source PowerManagerService.WakeLocks activation skipped\n");
+		return;
+	}
+
+	if (!enable_wlan_rx_wake_ws && !strcmp(ws->name, "wlan_rx_wake")) {
+		if (ws->active)
+			wakeup_source_deactivate(ws);
+			pr_info("wakeup source wlan_rx_wake activation skipped\n");
+		return;
+	}
+
+	if (!enable_wlan_ctrl_wake_ws && !strcmp(ws->name, "wlan_ctrl_wake")) {
+		if (ws->active)
+			wakeup_source_deactivate(ws);
+			pr_info("wakeup source wlan_ctrl_wake activation skipped\n");
+		return;
+	}
+
+	if (!enable_wlan_wake_ws && !strcmp(ws->name, "wlan_wake")) {
+		if (ws->active)
+			wakeup_source_deactivate(ws);
+			pr_info("wakeup source wlan_wake activation skipped\n");
 		return;
 	}
 
