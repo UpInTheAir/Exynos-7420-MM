@@ -79,8 +79,8 @@ config CGROUP_BFQIO
 	  filesystem interface.  The name of the subsystem will be
 	  bfqio.
 
-config IOSCHED_SIO
-	tristate "Simple I/O scheduler"
+config IOSCHED_SIOPLUS
+	tristate "Simple I/O scheduler plus"
 	default y
 	---help---
 	  The Simple I/O scheduler is an extremely simple scheduler,
@@ -125,8 +125,8 @@ choice
 		  any workload. It also tries to guarantee low latency to
 		  interactive and soft real-time applications.
 
-	config DEFAULT_SIO
-		bool "SIO" if IOSCHED_SIO=y
+	config DEFAULT_SIOPLUS
+		bool "SIOPLUS" if IOSCHED_SIOPLUS=y
 
 	config DEFAULT_NOOP
 		bool "No-op"
@@ -140,7 +140,7 @@ config DEFAULT_IOSCHED
 	default "row" if DEFAULT_ROW
 	default "cfq" if DEFAULT_CFQ
 	default "bfq" if DEFAULT_BFQ
-	default "sio" if DEFAULT_SIO
+	default "sioplus" if DEFAULT_SIOPLUS
 	default "noop" if DEFAULT_NOOP
 
 endmenu
