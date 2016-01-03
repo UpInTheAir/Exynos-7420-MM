@@ -53,6 +53,9 @@ module_param(enable_wlan_ctrl_wake_ws, bool, 0644);
 static bool enable_wlan_wake_ws = true;
 module_param(enable_wlan_wake_ws, bool, 0644);
 
+static bool enable_bluedroid_timer_ws = true;
+module_param(enable_bluedroid_timer_ws, bool, 0644);
+
 /*
  * If set, the suspend/hibernate code will abort transitions to a sleep state
  * if wakeup events are registered during or immediately before the transition.
@@ -628,6 +631,13 @@ static void wakeup_source_activate(struct wakeup_source *ws)
 		if (ws->active)
 			wakeup_source_deactivate(ws);
 			pr_info("wakeup source wlan_wake activation skipped\n");
+		return;
+	}
+
+	if (!enable_bluedroid_timer_ws && !strcmp(ws->name, "bluedroid_timer")) {
+		if (ws->active)
+			wakeup_source_deactivate(ws);
+			pr_info("wakeup source bluedroid_timer activation skipped\n");
 		return;
 	}
 
