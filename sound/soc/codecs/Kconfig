@@ -166,6 +166,19 @@ config SND_SOC_ARIZONA
 	default m if SND_SOC_VEGAS=m
 	default m if SND_SOC_LARGO=m
 
+config SND_SOC_ARIZONA_CONTROL
+	tristate "Kernel-space audio controls for Clearwater ASoC"
+	depends on SND_SOC_SAMSUNG_NOBLE_CLEARWATER || SND_SOC_SAMSUNG_ZERO_CLEARWATER
+	default y
+	help
+	  Basic controls include:
+
+	  - Headphone stereo volume
+	  - Mono mixer
+	  - 8-band stereo equalizer with combined or per-channel gains
+
+          If unsure, say N to disable this feature
+
 config SND_SOC_WM_HUBS
 	tristate
 	default y if SND_SOC_WM8993=y || SND_SOC_WM8994=y
