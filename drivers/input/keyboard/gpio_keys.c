@@ -11,7 +11,9 @@
 
 #include <linux/module.h>
 
+#ifdef CONFIG_POWERSUSPEND
 #include <linux/powersuspend.h>
+#endif
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
@@ -25,7 +27,9 @@
 #include <linux/platform_device.h>
 #include <linux/input.h>
 #include <linux/gpio_keys.h>
+#ifdef CONFIG_POWERSUSPEND
 #include <linux/wakelock.h>
+#endif
 #include <linux/workqueue.h>
 #include <linux/gpio.h>
 #include <linux/of_platform.h>
@@ -81,6 +85,7 @@ struct gpio_keys_drvdata {
 	struct gpio_button_data data[0];
 };
 
+#ifdef CONFIG_POWERSUSPEND
 static void sync_system(struct work_struct *work);
 static DECLARE_WORK(sync_system_work, sync_system);
 struct wake_lock sync_wake_lock;
@@ -98,6 +103,7 @@ static void sync_system(struct work_struct *work)
 	wake_unlock(&sync_wake_lock);
 	pr_info("%s -\n", __func__);
 }
+#endif
 
 /*
  * SYSFS interface for enabling/disabling keys and switches:
@@ -470,10 +476,15 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	unsigned int type = button->type ?: EV_KEY;
 	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
 
+#ifdef CONFIG_POWERSUSPEND
 	if (button->code == KEY_POWER) {
 		if (!!state) {
 			printk(KERN_INFO "PWR key is pressed\n");
 		}
+#else
+	if ((button->code == KEY_POWER) && !!state) {
+		printk(KERN_INFO "PWR key is pressed\n");
+#endif
 	}
 
 	if ((button->code == KEY_HOMEPAGE) && !!state) {
@@ -490,9 +501,11 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 
 	input_sync(input);
 
+#ifdef CONFIG_POWERSUSPEND
 	if (button->code == KEY_POWER) {
 		schedule_work_on(0, &sync_system_work);
 	}
+#endif
 #ifdef CONFIG_INPUT_BOOSTER
 	if (button->code == KEY_HOMEPAGE)
 		input_booster_send_event(BOOSTER_DEVICE_KEY, !!state);
@@ -501,6 +514,7 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 #endif
 }
 
+#ifdef CONFIG_POWERSUSPEND
 static void gpio_keys_early_suspend(struct power_suspend *handler)
 {
 	suspended = true;
@@ -517,6 +531,7 @@ static struct power_suspend gpio_suspend = {
 	.suspend = gpio_keys_early_suspend,
 	.resume = gpio_keys_late_resume,
 };
+#endif
 
 static void gpio_keys_gpio_work_func(struct work_struct *work)
 {
@@ -1133,9 +1148,11 @@ static struct platform_driver gpio_keys_device_driver = {
 
 static int __init gpio_keys_init(void)
 {
+#ifdef CONFIG_POWERSUSPEND
 	register_power_suspend(&gpio_suspend);
 	wake_lock_init(&sync_wake_lock, WAKE_LOCK_SUSPEND,
 		"sync_wake_lock");
+#endif
 	return platform_driver_register(&gpio_keys_device_driver);
 }
 
