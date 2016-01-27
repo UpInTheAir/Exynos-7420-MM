@@ -244,8 +244,10 @@ struct ufs_clk_info {
 	bool enabled;
 };
 
-#define PRE_CHANGE      0
-#define POST_CHANGE     1
+enum ufs_notify_change_status {
+	PRE_CHANGE,
+	POST_CHANGE,
+};
 
 struct ufs_pa_layer_attr {
 	u32 gear_rx;
@@ -289,14 +291,17 @@ struct ufs_hba_variant_ops {
 	int     (*setup_regulators)(struct ufs_hba *, bool);
 	void	(*host_reset)(struct ufs_hba *);
 	int     (*hce_enable_notify)(struct ufs_hba *, bool);
-	int     (*link_startup_notify)(struct ufs_hba *, bool);
-	int	(*pwr_change_notify)(struct ufs_hba *,
-					bool, struct ufs_pa_layer_attr *,
+	int     (*link_startup_notify)(struct ufs_hba *,
+					enum ufs_notify_change_status);
+	int		(*pwr_change_notify)(struct ufs_hba *,
+					enum ufs_notify_change_status,
+					struct ufs_pa_layer_attr *,
 					struct ufs_pa_layer_attr *);
 	void	(*set_nexus_t_xfer_req)(struct ufs_hba *,
 					int, struct scsi_cmnd *);
 	void	(*set_nexus_t_task_mgmt)(struct ufs_hba *, int, u8);
-	void	(*hibern8_notify)(struct ufs_hba *, u8, bool);
+	void	(*hibern8_notify)(struct ufs_hba *, u8,
+					enum ufs_notify_change_status);
 	int     (*suspend)(struct ufs_hba *, enum ufs_pm_op);
 	int     (*resume)(struct ufs_hba *, enum ufs_pm_op);
 };
