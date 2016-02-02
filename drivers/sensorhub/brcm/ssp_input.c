@@ -22,15 +22,15 @@
 
 #include <linux/moduleparam.h>
 
-static int wl_motion = 3;
+static int wl_motion = 1;
 module_param(wl_motion, int, 0644);
 static int wl_prox = 1;
 module_param(wl_prox, int, 0644);
-static int wl_tilt = 3;
+static int wl_tilt = 1;
 module_param(wl_tilt, int, 0644);
-static int wl_grip = 3;
+static int wl_grip = 1;
 module_param(wl_grip, int, 0644);
-static int wl_pickup = 3;
+static int wl_pickup = 1;
 module_param(wl_pickup, int, 0644);
 
 /*************************************************************************/
