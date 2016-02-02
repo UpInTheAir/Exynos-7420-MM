@@ -210,7 +210,7 @@ static u32 vendor_oui = CONFIG_DHD_SET_RANDOM_MAC_VAL;
 
 #include <linux/moduleparam.h>
 
-static int wl_divide = 1;
+static int wl_divide = 3;
 module_param(wl_divide, int, 0644);
 
 /* Maximum STA per radio */
