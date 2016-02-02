@@ -17,7 +17,7 @@
 
 #include <linux/moduleparam.h>
 
-static int wl_ssp = 3;
+static int wl_ssp = 1;
 module_param(wl_ssp, int, 0644);
 
 static void init_sensorlist(struct ssp_data *data)

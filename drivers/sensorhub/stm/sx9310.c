@@ -32,7 +32,7 @@
 
 #include <linux/moduleparam.h>
 
-static int wl_grip = 3;
+static int wl_grip = 1;
 module_param(wl_grip, int, 0644);
 
 #define VENDOR_NAME              "SEMTECH"
