@@ -12,6 +12,12 @@
 #include <linux/battery/sec_battery.h>
 #include <linux/sec_debug.h>
 
+static unsigned int STORE_MODE_CHARGING_MAX = 70;
+static unsigned int STORE_MODE_CHARGING_MIN = 60;
+
+module_param_named(store_mode_max, STORE_MODE_CHARGING_MAX, uint, S_IWUSR | S_IRUGO);
+module_param_named(store_mode_min, STORE_MODE_CHARGING_MIN, uint, S_IWUSR | S_IRUGO);
+
 const char *charger_chip_name;
 
 bool sleep_mode = false;
@@ -4537,7 +4543,7 @@ ssize_t sec_bat_store_attrs(
 	case STORE_MODE:
 		if (sscanf(buf, "%d\n", &x) == 1) {
 			if (x) {
-				battery->store_mode = true;
+				battery->store_mode = false;
 #if !defined(CONFIG_SEC_FACTORY)
 				if (battery->store_mode) {
 					if (battery->capacity <= 5) {
@@ -7473,7 +7479,7 @@ static int __devinit sec_battery_probe(struct platform_device *pdev)
 			value);
 #endif
 #if defined(CONFIG_STORE_MODE) && !defined(CONFIG_SEC_FACTORY)
-		battery->store_mode = true;
+		battery->store_mode = false;
 		value.intval = 0;
 		psy_do_property(battery->pdata->fuelgauge_name, get,
 			POWER_SUPPLY_PROP_CAPACITY, value);
