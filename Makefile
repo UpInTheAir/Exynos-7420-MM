@@ -419,7 +419,6 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-delete-null-pointer-checks \
 		   -fdiagnostics-show-option -Werror \
 		   -pipe -fno-pic -O2 \
-		   -mcpu=cortex-a57.cortex-a53 \
 		   -march=armv8-a+crc \
 		   -mtune=cortex-a57.cortex-a53 \
 		   -std=gnu89
