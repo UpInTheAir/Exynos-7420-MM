@@ -415,7 +415,10 @@ KBUILD_CPPFLAGS := -D__KERNEL__
 KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
+		   -fmodulo-sched -fmodulo-sched-allow-regmoves \
 		   -Wno-format-security \
+		   -fivopts -funswitch-loops -fpredictive-commoning -fgcse-after-reload \
+		   -fbranch-target-load-optimize -fsingle-precision-constant \
 		   -fno-delete-null-pointer-checks \
 		   -fdiagnostics-show-option -Werror \
 		   -pipe -fno-pic -O2 \
@@ -628,7 +631,7 @@ ifdef CONFIG_CC_OPTIMIZE_MORE
 KBUILD_CFLAGS	+= -O3
 endif
 ifdef CONFIG_CC_OPTIMIZE_FAST
-KBUILD_CFLAGS	+= -Ofast
+KBUILD_CFLAGS	+= -Ofast $(call cc-disable-warning,maybe-uninitialized,)
 endif
 ifdef CONFIG_CC_GRAPHITE_OPTIMIZATION
 KBUILD_CFLAGS	+= $(GRAPHITE)
