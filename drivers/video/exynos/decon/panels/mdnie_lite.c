@@ -5,6 +5,7 @@
 */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/mutex.h>
@@ -18,6 +19,9 @@
 #include <linux/pm_runtime.h>
 
 #include "mdnie.h"
+
+static int elable_toggle_negative = 0;
+module_param(elable_toggle_negative, int, 0644);
 
 #define MDNIE_SYSFS_PREFIX		"/sdcard/mdnie/"
 
@@ -425,6 +429,7 @@ static ssize_t accessibility_store(struct device *dev,
 //gm
 void mdnie_toggle_negative(void)
 {
+	if(!elable_toggle_negative) return;
 	mutex_lock(&g_mdnie->lock);
 	g_mdnie->accessibility = !g_mdnie->accessibility;
 	mutex_unlock(&g_mdnie->lock);
