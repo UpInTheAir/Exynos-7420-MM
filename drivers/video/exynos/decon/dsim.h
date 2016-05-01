@@ -170,6 +170,11 @@ struct panel_private {
 	int override_br_value;
 
 	int esd_disable;
+
+#ifdef CONFIG_KEYBOARD_CYPRESS_DSIM_BRIGHTNESS_SYNC
+	unsigned int *tk_br_tbl;
+	unsigned int tk_brightness_sync;
+#endif
 };
 
 struct dsim_panel_ops {
