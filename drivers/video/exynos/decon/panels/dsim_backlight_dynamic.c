@@ -21,6 +21,10 @@
 #include "aid_dimming.h"
 #endif
 
+#ifdef CONFIG_KEYBOARD_CYPRESS_DSIM_BRIGHTNESS_SYNC
+#include "../../../../input/keyboard/cypress_20075/cypress_touchkey.h"
+#endif
+
 struct aid_dimming_dynamic_var aid_dimming_dynamic;
 unsigned dynamic_lcd_type;
 
@@ -622,6 +626,11 @@ set_brightness:
 		dsim_err("%s failed to set brightness : %d\n", __func__, acutal_br);
 	}
 	mutex_unlock(&panel->lock);
+
+#ifdef CONFIG_KEYBOARD_CYPRESS_DSIM_BRIGHTNESS_SYNC
+	if (panel->tk_brightness_sync)
+		change_touch_key_led_voltage(dsim->dev, panel->tk_br_tbl[p_br]);
+#endif
 
 set_br_exit:
 #endif
