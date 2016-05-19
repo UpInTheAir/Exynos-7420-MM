@@ -30,6 +30,10 @@
 #include <linux/suspend.h>
 #include <linux/exynos-ss.h>
 
+#ifdef CONFIG_CPU_FREQ_GOV_KTOONSERVATIVE
+#include <linux/cpufreq_kt.h>
+#endif
+
 //#define DM_HOTPLUG_DEBUG
 
 #if defined(CONFIG_SOC_EXYNOS5430)
