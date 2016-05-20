@@ -34,6 +34,9 @@ extern bool wpc_temp_mode;
 #define ENABLE 1
 #define DISABLE 0
 
+int SIOP_INPUT_LIMIT_CURRENT = 1200;
+int SIOP_CHARGING_LIMIT_CURRENT = 1000;
+
 static enum power_supply_property max77833_charger_props[] = {
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_PRESENT,
@@ -2253,6 +2256,7 @@ static irqreturn_t max77833_aicl_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+bool unstable_power_detection = true;
 static void max77833_chgin_isr_work(struct work_struct *work)
 {
 	struct max77833_charger_data *charger = container_of(work,
@@ -2290,7 +2294,7 @@ static void max77833_chgin_isr_work(struct work_struct *work)
 			stable_count++;
 		else
 			stable_count = 0;
-		if (stable_count > 10) {
+		if (stable_count > 10 || !unstable_power_detection) {
 #if defined(CONFIG_VBUS_NOTIFIER)
 			switch (chgin_dtls) {
 					case 0x03:
