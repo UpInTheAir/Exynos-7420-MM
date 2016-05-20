@@ -32,6 +32,18 @@ module_param(enable_ssp_wl, bool, 0644);
 static bool enable_bcm4773_wl = true;
 module_param(enable_bcm4773_wl, bool, 0644);
 
+static bool enable_lli_pm_wl = true;
+module_param(enable_lli_pm_wl, bool, 0644);
+
+static bool enable_radio_interface_wl = true;
+module_param(enable_radio_interface_wl, bool, 0644);
+
+static bool enable_umts_ipc0_wl = true;
+module_param(enable_umts_ipc0_wl, bool, 0644);
+
+static bool enable_power_manager_service_wl = true;
+module_param(enable_power_manager_service_wl, bool, 0644);
+
 /*
  * If set, the suspend/hibernate code will abort transitions to a sleep state
  * if wakeup events are registered during or immediately before the transition.
@@ -414,6 +426,26 @@ static void wakeup_source_activate(struct wakeup_source *ws)
 
 	if (!enable_bcm4773_wl && !strcmp(ws->name, "bcm4773_wake_lock")) {
 		pr_info("wakeup source bcm4773 activation skipped\n");
+		return;
+	}
+
+	if (!enable_lli_pm_wl && !strcmp(ws->name, "lli_pm_wsock")) {
+		pr_info("wakeup source lli_pm activation skipped\n");
+		return;
+	}
+
+	if (!enable_radio_interface_wl && !strcmp(ws->name, "radio-interface")) {
+		pr_info("wakeup source radio-interface activation skipped\n");
+		return;
+	}
+
+	if (!enable_umts_ipc0_wl && !strcmp(ws->name, "umts_ipc0")) {
+		pr_info("wakeup source umts_ipc0 activation skipped\n");
+		return;
+	}
+
+	if (!enable_power_manager_service_wl && !strcmp(ws->name, "PowerManagerService.WakeLocks")) {
+		pr_info("wakeup source PowerManagerService.WakeLocks activation skipped\n");
 		return;
 	}
 
