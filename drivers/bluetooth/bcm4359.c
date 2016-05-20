@@ -40,6 +40,11 @@
 //#include <../../arch/arm/mach-exynos/include/mach/gpio.h>
 #include <plat/gpio-cfg.h>
 
+#include <linux/moduleparam.h>
+
+static int wl_divide_bt = 2;
+module_param(wl_divide_bt, int, 0644);
+
 #define BT_LPM_ENABLE
 
 #define BT_UPORT 4
@@ -156,7 +161,7 @@ static enum hrtimer_restart enter_lpm(struct hrtimer *timer)
 
 	bt_is_running = 0;
 
-	wake_lock_timeout(&bt_lpm.bt_wake_lock, HZ/2);
+	wake_lock_timeout(&bt_lpm.bt_wake_lock, HZ / wl_divide_bt);
 
 	return HRTIMER_NORESTART;
 }
