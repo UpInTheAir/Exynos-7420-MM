@@ -71,6 +71,7 @@ static unsigned int low_stay_threshold = DEFAULT_LOW_STAY_THRSHD;
 static int cpu_util[NR_CPUS];
 static unsigned int cur_load_freq = 0;
 static bool lcd_is_on = true;
+static bool lcd_is_on_real = true;
 static bool forced_hotplug = false;
 static bool in_low_power_mode = false;
 static bool in_suspend_prepared = false;
@@ -579,6 +580,7 @@ static int fb_state_change(struct notifier_block *nb,
 	switch (blank) {
 	case FB_BLANK_POWERDOWN:
 		lcd_is_on = false;
+		lcd_is_on_real = false;
 		pr_info("LCD is off\n");
 
 #ifdef CONFIG_HOTPLUG_THREAD_STOP
@@ -596,6 +598,7 @@ static int fb_state_change(struct notifier_block *nb,
 		 * This line of code release max limit when LCD is
 		 * turned on.
 		 */
+		lcd_is_on_real = true;
 		if (enable_hotplug_hack)
 			lcd_is_on = false;
 		else
@@ -741,6 +744,8 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 			} else {
 				if (enable_hotplug_hack)
 					lcd_is_on = false;
+				else
+					lcd_is_on = lcd_is_on_real;
 				if (lcd_is_on) {
 					for (i = NR_CLUST0_CPUS; i < max_num_cpu; i++) {
 						if (do_hotplug_out)
