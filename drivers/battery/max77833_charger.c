@@ -24,6 +24,14 @@
 #endif
 #include <linux/of_gpio.h>
 
+#include <linux/moduleparam.h>
+
+static int wl_mains = 3;
+module_param(wl_mains, int, 0644);
+
+static int wl_wireless = 7;
+module_param(wl_wireless, int, 0644);
+
 extern unsigned int lpcharge;
 
 #if defined(CONFIG_WIRELESS_CHARGER_HIGH_VOLTAGE)
@@ -1090,7 +1098,7 @@ static void max77833_charger_function_control(
 			charger->charging_current_max = INPUT_CURRENT_TA;
 			cancel_delayed_work(&charger->afc_work);
 			queue_delayed_work(charger->wqueue, &charger->afc_work, msecs_to_jiffies(2000));
-			wake_lock_timeout(&charger->afc_wake_lock, HZ * 3);
+			wake_lock_timeout(&charger->afc_wake_lock, HZ * wl_mains);
 		}
 
 		if ((charger->max77833->pmic_rev_pass5) &&
@@ -1111,7 +1119,7 @@ static void max77833_charger_function_control(
 			charger->charging_current_max = INPUT_CURRENT_WPC;
 			cancel_delayed_work(&charger->wc_afc_work);
 			queue_delayed_work(charger->wqueue, &charger->wc_afc_work, msecs_to_jiffies(4000));
-			wake_lock_timeout(&charger->afc_wake_lock, HZ * 7);
+			wake_lock_timeout(&charger->afc_wake_lock, HZ * wl_wireless);
 		}
 
 		/* prepare calculate current cable's input current(chgin) */
