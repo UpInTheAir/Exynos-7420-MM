@@ -36,6 +36,12 @@
 
 #include "wacom_i2c_func.h"
 #include "wacom_i2c_firm.h"
+
+#include <linux/moduleparam.h>
+
+static int wl_divide_pen = 10;
+module_param(wl_divide_pen, int, 0644);
+
 #define WACOM_FW_PATH_SDCARD "/sdcard/firmware/wacom_firm.bin"
 
 static struct wacom_features wacom_feature_EMR = {
@@ -471,7 +477,7 @@ static irqreturn_t wacom_pen_detect(int irq, void *dev_id)
 	struct wacom_i2c *wac_i2c = dev_id;
 
 	cancel_delayed_work_sync(&wac_i2c->pen_insert_dwork);
-	wake_lock_timeout(&wac_i2c->det_wakelock, HZ / 10);
+	wake_lock_timeout(&wac_i2c->det_wakelock, HZ / wl_divide_pen);
 	schedule_delayed_work(&wac_i2c->pen_insert_dwork, HZ / 20);
 	return IRQ_HANDLED;
 }
