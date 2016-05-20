@@ -58,6 +58,12 @@
 #include <linux/rcupdate.h>
 #include <linux/sched.h>
 #include <linux/signal.h>
+
+#include <linux/moduleparam.h>
+
+static int wl_nfc = 2;
+module_param(wl_nfc, int, 0644);
+
 #define SIG_NFC 44
 
 #define MAX_BUFFER_SIZE		512
@@ -135,7 +141,7 @@ static irqreturn_t pn547_dev_irq_handler(int irq, void *dev_id)
 #if NFC_DEBUG
 	pr_info("pn547 : call\n");
 #endif
-	wake_lock_timeout(&pn547_dev->nfc_wake_lock, 2*HZ);
+	wake_lock_timeout(&pn547_dev->nfc_wake_lock, wl_nfc * HZ);
 	return IRQ_HANDLED;
 }
 
