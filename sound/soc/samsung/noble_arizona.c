@@ -56,6 +56,11 @@
 #include "esa_sa_effect.h"
 #endif
 
+#include <linux/moduleparam.h>
+
+static int wl_arizona = 5000;
+module_param(wl_arizona, int, 0644);
+
 
 /* NOBLE use CLKOUT from AP */
 #define NOBLE_MCLK_FREQ	24000000
@@ -1711,7 +1716,7 @@ static void ez2ctrl_voicewakeup_cb(void)
 	dev_info(the_codec->dev, "%s : raise the uevent, string = %s\n",
 			__func__, keyword_buf);
 
-	wake_lock_timeout(&priv->wake_lock, 5000);
+	wake_lock_timeout(&priv->wake_lock, wl_arizona);
 	kobject_uevent_env(&(the_codec->dev->kobj), KOBJ_CHANGE, envp);
 
 	return;
