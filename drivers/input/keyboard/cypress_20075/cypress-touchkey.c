@@ -1068,6 +1068,7 @@ static int touchkey_i2c_update(struct touchkey_i2c *tkey_i2c)
 	return ret;
 }
 
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_NEGATIVE_EFFECT_CONTROL
 static inline int64_t get_time_inms(void) {
 	int64_t tinms;
 	struct timespec cur_time = current_kernel_time();
@@ -1077,6 +1078,7 @@ static inline int64_t get_time_inms(void) {
 }
 
 extern void mdnie_toggle_negative(void);
+#endif
 
 static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 {
@@ -1085,8 +1087,10 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 	int ret;
 	int i;
 	int keycode_data[touchkey_count];
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_NEGATIVE_EFFECT_CONTROL
 	static int64_t mtkey_lasttime = 0;
 	static int mtkey_count = 0;
+#endif
 
 	if (unlikely(!touchkey_probe)) {
 		tk_debug_err(true, &tkey_i2c->client->dev, "%s: Touchkey is not probed\n", __func__);
@@ -1125,6 +1129,7 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 #if defined(CONFIG_INPUT_BOOSTER)
 			input_booster_send_event(BOOSTER_DEVICE_TOUCHKEY, (keycode_data[i] % 2));
 #endif
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_NEGATIVE_EFFECT_CONTROL
 			//mdnie negative effect toggle by gm
 			if (touchkey_keycode[i] == 254) {
 				if (keycode_data[i] % 2) {
@@ -1142,6 +1147,7 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 					mtkey_lasttime = get_time_inms();
 				}
 			}
+#endif
 		}
 	}
 
