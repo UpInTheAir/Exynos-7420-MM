@@ -149,7 +149,9 @@ struct mdnie_info {
 	unsigned int		accessibility;
 	unsigned int		color_correction;
 	unsigned int		auto_brightness;
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_NEGATIVE_EFFECT_CONTROL
 	unsigned int		toggle_negative;
+#endif
 
 	char			path[50];
 
