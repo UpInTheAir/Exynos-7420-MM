@@ -12,6 +12,11 @@
 #include <linux/battery/sec_battery.h>
 #include <linux/sec_debug.h>
 
+#include <linux/moduleparam.h>
+
+static int wl_polling = 5;
+module_param(wl_polling, int, 0644);
+
 static unsigned int STORE_MODE_CHARGING_MAX = 70;
 static unsigned int STORE_MODE_CHARGING_MIN = 60;
 
@@ -3376,7 +3381,7 @@ skip_monitor:
 	sec_bat_set_polling(battery);
 
 	if (battery->capacity <= 0 || battery->health_change)
-		wake_lock_timeout(&battery->monitor_wake_lock, HZ * 5);
+		wake_lock_timeout(&battery->monitor_wake_lock, HZ * wl_polling);
 	else
 		wake_unlock(&battery->monitor_wake_lock);
 
