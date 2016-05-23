@@ -907,58 +907,52 @@ static ssize_t show_scaling_min_freq_kt(struct cpufreq_policy *policy, char *buf
 	return sprintf(buf, "%u\n", GLOBALKT_MIN_FREQ_LIMIT[policy->cpu]);
 }
 
-static ssize_t store_scaling_min_freq(struct cpufreq_policy *policy, const char *buf, size_t count)
+static ssize_t store_scaling_min_freq(struct cpufreq_policy *policy,
+					const char *buf, size_t count)
 {
-	unsigned int ret = -EINVAL;
-	unsigned int value = 0;
+	unsigned int ret;
 	struct cpufreq_policy new_policy;
 
-	ret = sscanf(buf, "%u", &value);
+	ret = cpufreq_get_policy(&new_policy, policy->cpu);
+	if (ret)
+		return -EINVAL;
+
+	ret = sscanf(buf, "%u", &new_policy.user_min);
 	if (ret != 1)
 		return -EINVAL;
-	
-	if (vfreq_lock == 0)
-	{
-		if (value <= GLOBALKT_MIN_FREQ_LIMIT[policy->cpu])
-			value = GLOBALKT_MIN_FREQ_LIMIT[policy->cpu];
+	ret = sscanf(buf, "%u", &new_policy.min);
+	if (ret != 1)
+		return -EINVAL;
 
-		ret = cpufreq_get_policy(&new_policy, policy->cpu);
-		new_policy.min = value;
-		policy->user_policy.min = new_policy.min;
-		new_policy.user_policy.min = new_policy.min;
-		ret = __cpufreq_set_policy(policy, &new_policy);
-		policy->user_policy.min = policy->min;
-	}
-	
-	return count;
+	ret = __cpufreq_set_policy(policy, &new_policy);
+	policy->user_policy.user_min = policy->user_min;
+	policy->user_policy.min = policy->min;
+
+	return ret ? ret : count;
 }
 
-static ssize_t store_scaling_max_freq(struct cpufreq_policy *policy, const char *buf, size_t count)
+static ssize_t store_scaling_max_freq(struct cpufreq_policy *policy,
+					const char *buf, size_t count)
 {
-	unsigned int ret = -EINVAL;
-	unsigned int value = 0;
+	unsigned int ret;
 	struct cpufreq_policy new_policy;
 
-	ret = sscanf(buf, "%u", &value);
+	ret = cpufreq_get_policy(&new_policy, policy->cpu);
+	if (ret)
+		return -EINVAL;
+
+	ret = sscanf(buf, "%u", &new_policy.user_max);
+	if (ret != 1)
+		return -EINVAL;
+	ret = sscanf(buf, "%u", &new_policy.max);
 	if (ret != 1)
 		return -EINVAL;
 
-	if (vfreq_lock == 0)
-	{
-		if (value > GLOBALKT_MAX_FREQ_LIMIT[policy->cpu])
-			value = GLOBALKT_MAX_FREQ_LIMIT[policy->cpu];
-		if (value < GLOBALKT_MIN_FREQ_LIMIT[policy->cpu])
-			value = GLOBALKT_MIN_FREQ_LIMIT[policy->cpu];
+	ret = __cpufreq_set_policy(policy, &new_policy);
+	policy->user_policy.user_max = policy->user_max;
+	policy->user_policy.max = policy->max;
 
-		ret = cpufreq_get_policy(&new_policy, policy->cpu);
-		new_policy.max = value;
-		policy->user_policy.max = new_policy.max;
-		new_policy.user_policy.max = new_policy.max;
-		ret = __cpufreq_set_policy(policy, &new_policy);
-		policy->user_policy.max = policy->max;
-
-	}
-	return count;
+	return ret ? ret : count;
 }
 
 static ssize_t show_freq_lock(struct cpufreq_policy *policy, char *buf)
@@ -1333,11 +1327,15 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 	 */
 	cpumask_and(policy->cpus, policy->cpus, cpu_online_mask);
 	
-	if (last_min > -1)
+	if (last_min > -1) {
 		policy->min = last_min;
-	
-	if (last_max > -1)
+		policy->user_min = last_min;
+	}
+
+	if (last_max > -1) {
 		policy->max = last_max;
+		policy->user_max = last_max;
+	}
 
 	policy->user_policy.min = policy->min;
 	policy->user_policy.max = policy->max;
@@ -2166,6 +2164,8 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 
 	data->min = policy->min;
 	data->max = policy->max;
+	data->user_min = policy->user_min;
+	data->user_max = policy->user_max;
 
 	pr_debug("new min and max freqs are %u - %u kHz\n",
 					data->min, data->max);
