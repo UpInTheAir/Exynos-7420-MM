@@ -2454,7 +2454,7 @@ static void cpufreq_param_set_init(struct cpufreq_ktoonservative_tunables *tunab
 	tunables->sampling_rate_screen_off = 40000;
 	tunables->ignore_nice_load = 0;
 	tunables->freq_step_raise_screen_on = 5;
-	tunables->freq_step_raise_screen_off = 2;
+	tunables->freq_step_raise_screen_off = 4;
 	tunables->freq_step_lower_screen_on = 4;
 	tunables->freq_step_lower_screen_off = 8;
 	tunables->debug_enabled = 0;
