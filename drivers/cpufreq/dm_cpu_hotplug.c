@@ -1,5 +1,6 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 #include <linux/cpufreq_kt.h>
@@ -66,7 +67,9 @@ static DEFINE_MUTEX(cluster0_hotplug_in_lock);
 static DEFINE_MUTEX(thread_manage_lock);
 #endif
 
-static bool enable_hotplug_hack = false;
+static int enable_hotplug_hack = 0;
+module_param(enable_hotplug_hack, int, 0644);
+
 static struct task_struct *dm_hotplug_task;
 #ifdef CONFIG_HOTPLUG_THREAD_STOP
 static bool thread_start = false;
@@ -436,23 +439,6 @@ static ssize_t store_cpucore_max_num_limit(struct kobject *kobj,
 
 	return count;
 }
-
-static ssize_t show_hotplug_hack(struct kobject *kobj,
-				struct attribute *attr, char *buf)
-{
-	return sprintf(buf, "%d\n", enable_hotplug_hack ? 1 : 0);
-}
-
-static ssize_t store_hotplug_hack(struct kobject *kobj, struct attribute *attr,
-					const char *buf, size_t count)
-{
-	enable_hotplug_hack = enable_hotplug_hack ? false : true;
-	return count;
-}
-
-static struct global_attr hotplug_hack =
-		__ATTR(hotplug_hack, S_IRUGO | S_IWUSR,
-			show_hotplug_hack, store_hotplug_hack);
 
 static struct global_attr enable_dm_hotplug =
 		__ATTR(enable_dm_hotplug, S_IRUGO | S_IWUSR,
@@ -1331,12 +1317,6 @@ static int __init dm_cpu_hotplug_init(void)
 #endif
 
 	fb_register_client(&fb_block);
-
-	ret = sysfs_create_file(power_kobj, &hotplug_hack.attr);
-	if (ret) {
-		pr_err("%s: failed to create hotplug_hack sysfs interface\n",
-			__func__);
-	}
 
 #ifdef CONFIG_PM
 	ret = sysfs_create_file(power_kobj, &enable_dm_hotplug.attr);
