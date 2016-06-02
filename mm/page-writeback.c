@@ -37,13 +37,7 @@
 #include <linux/timer.h>
 #include <linux/sched/rt.h>
 #include <trace/events/writeback.h>
-#ifdef CONFIG_DYNAMIC_PAGE_WRITEBACK
-#include <linux/powersuspend.h>
-#endif
-#ifdef CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO
-#include <linux/powersuspend.h>
-#endif
-#ifdef CONFIG_ADAPTIVE_VM_DIRTY_RATIO
+#if defined(CONFIG_DYNAMIC_PAGE_WRITEBACK) || defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO) || defined(CONFIG_ADAPTIVE_VM_DIRTY_RATIO)
 #include <linux/powersuspend.h>
 #endif
 
@@ -1777,18 +1771,18 @@ static struct notifier_block __cpuinitdata ratelimit_nb = {
 #ifdef CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO
 static void dbackground_power_suspend(struct power_suspend *handler)
 {
-	if (dirty_suspend_background_ratio != resume_dirty_background_ratio)
-		resume_dirty_background_ratio = dirty_suspend_background_ratio;
+	if (dirty_background_ratio != resume_dirty_background_ratio)
+		resume_dirty_background_ratio = dirty_background_ratio;
 
-	dirty_suspend_background_ratio = suspend_dirty_background_ratio;
+	dirty_background_ratio = suspend_dirty_background_ratio;
 }
 
 static void dbackground_power_resume(struct power_suspend *handler)
 {
-	if (dirty_suspend_background_ratio != suspend_dirty_background_ratio)
-		suspend_dirty_background_ratio = dirty_suspend_background_ratio;
+	if (dirty_background_ratio != suspend_dirty_background_ratio)
+		suspend_dirty_background_ratio = dirty_background_ratio;
 
-	dirty_suspend_background_ratio = resume_dirty_background_ratio;
+	dirty_background_ratio = resume_dirty_background_ratio;
 }
 
 static struct power_suspend dbackground_suspend = {
@@ -1800,18 +1794,18 @@ static struct power_suspend dbackground_suspend = {
 #ifdef CONFIG_ADAPTIVE_VM_DIRTY_RATIO
 static void dratio_power_suspend(struct power_suspend *handler)
 {
-	if (vm_suspend_dirty_ratio != resume_vm_dirty_ratio)
-		resume_vm_dirty_ratio = vm_suspend_dirty_ratio;
+	if (vm_dirty_ratio != resume_vm_dirty_ratio)
+		resume_vm_dirty_ratio = vm_dirty_ratio;
 
-	vm_suspend_dirty_ratio = suspend_vm_dirty_ratio;
+	vm_dirty_ratio = suspend_vm_dirty_ratio;
 }
 
 static void dratio_power_resume(struct power_suspend *handler)
 {
-	if (vm_suspend_dirty_ratio != suspend_vm_dirty_ratio)
-		suspend_vm_dirty_ratio = vm_suspend_dirty_ratio;
+	if (vm_dirty_ratio != suspend_vm_dirty_ratio)
+		suspend_vm_dirty_ratio = vm_dirty_ratio;
 
-	vm_suspend_dirty_ratio = resume_vm_dirty_ratio;
+	vm_dirty_ratio = resume_vm_dirty_ratio;
 }
 
 static struct power_suspend dratio_suspend = {
