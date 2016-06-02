@@ -73,7 +73,7 @@ static long ratelimit_pages = 32;
 #ifdef CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO
 #define DEFAULT_DIRTY_BACKGROUND_RATIO 20
 int dirty_background_ratio, resume_dirty_background_ratio;
-#define DEFAULT_DIRTY_SUSPEND_BACKGROUND_RATIO 60
+#define DEFAULT_DIRTY_SUSPEND_BACKGROUND_RATIO 10
 int dirty_suspend_background_ratio, suspend_dirty_background_ratio;
 #else
 int dirty_background_ratio = 20;
@@ -97,7 +97,7 @@ int vm_highmem_is_dirtyable;
 #ifdef CONFIG_ADAPTIVE_VM_DIRTY_RATIO
 #define DEFAULT_VM_DIRTY_RATIO 40
 int vm_dirty_ratio, resume_vm_dirty_ratio;
-#define DEFAULT_VM_SUSPEND_DIRTY_RATIO 95
+#define DEFAULT_VM_SUSPEND_DIRTY_RATIO 20
 int vm_suspend_dirty_ratio, suspend_vm_dirty_ratio;
 #else
 int vm_dirty_ratio = 40;
