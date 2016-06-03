@@ -111,6 +111,7 @@ config WACOM_LCD_FREQ_COMPENSATE
 
 config WACOM_FORCE_BATTERY_SAVING_MODE
 	bool "Disable the Wacom digitizer on S-Pen insertion"
+	depends on INPUT_WACOM
 	help
 	  Say Y here if you want to force enable the power save features.
 
