@@ -160,7 +160,9 @@ int regulator_bulk_force_disable(int num_consumers,
 void regulator_bulk_free(int num_consumers,
 			 struct regulator_bulk_data *consumers);
 
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_CAPACITIVE_BRIGHTNESS_CONTROL
 int regulator_tk_fw_hack(struct regulator *regulator);
+#endif
 
 int regulator_can_change_voltage(struct regulator *regulator);
 int regulator_count_voltages(struct regulator *regulator);
