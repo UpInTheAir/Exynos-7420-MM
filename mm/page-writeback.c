@@ -37,7 +37,7 @@
 #include <linux/timer.h>
 #include <linux/sched/rt.h>
 #include <trace/events/writeback.h>
-#if defined(CONFIG_DYNAMIC_PAGE_WRITEBACK) || defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO) || defined(CONFIG_ADAPTIVE_VM_DIRTY_RATIO)
+#if defined(CONFIG_DYNAMIC_PAGE_WRITEBACK) || defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO) || defined(CONFIG_ADAPTIVE_VM_DIRTY_RATIO) || defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_BYTES) || defined(CONFIG_ADAPTIVE_VM_DIRTY_BYTES)
 #include <linux/powersuspend.h>
 #endif
 
@@ -70,20 +70,29 @@ static long ratelimit_pages = 32;
 /*
  * Start background writeback (via writeback threads) at this percentage
  */
-#ifdef CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO
+#if defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO) && ! defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_BYTES)
 #define DEFAULT_DIRTY_BACKGROUND_RATIO 20
 int dirty_background_ratio, resume_dirty_background_ratio;
 #define DEFAULT_DIRTY_SUSPEND_BACKGROUND_RATIO 10
 int dirty_suspend_background_ratio, suspend_dirty_background_ratio;
-#else
+#elif ! defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO) && ! defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_BYTES)
 int dirty_background_ratio = 20;
+#else
+int dirty_background_ratio;
 #endif
 
 /*
  * dirty_background_bytes starts at 0 (disabled) so that it is a function of
  * dirty_background_ratio * the amount of dirtyable memory
  */
+#if defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_BYTES) && ! defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO)
+#define DEFAULT_DIRTY_BACKGROUND_BYTES 20971520 // 20MB
+unsigned long dirty_background_bytes, resume_dirty_background_bytes;
+#define DEFAULT_DIRTY_SUSPEND_BACKGROUND_BYTES 20971520 // 20MB
+unsigned long dirty_suspend_background_bytes, suspend_dirty_background_bytes;
+#else
 unsigned long dirty_background_bytes;
+#endif
 
 /*
  * free highmem will not be subtracted from the total free memory
@@ -94,20 +103,30 @@ int vm_highmem_is_dirtyable;
 /*
  * The generator of dirty data starts writeback at this percentage
  */
-#ifdef CONFIG_ADAPTIVE_VM_DIRTY_RATIO
+#if defined(CONFIG_ADAPTIVE_VM_DIRTY_RATIO) && ! defined(CONFIG_ADAPTIVE_VM_DIRTY_BYTES)
 #define DEFAULT_VM_DIRTY_RATIO 40
 int vm_dirty_ratio, resume_vm_dirty_ratio;
 #define DEFAULT_VM_SUSPEND_DIRTY_RATIO 20
 int vm_suspend_dirty_ratio, suspend_vm_dirty_ratio;
-#else
+#elif ! defined(CONFIG_ADAPTIVE_VM_DIRTY_BYTES) && ! defined(CONFIG_ADAPTIVE_VM_DIRTY_RATIO)
 int vm_dirty_ratio = 40;
+#else
+int vm_dirty_ratio;
 #endif
+
 
 /*
  * vm_dirty_bytes starts at 0 (disabled) so that it is a function of
  * vm_dirty_ratio * the amount of dirtyable memory
  */
+#if defined(CONFIG_ADAPTIVE_VM_DIRTY_BYTES) && ! defined(CONFIG_ADAPTIVE_VM_DIRTY_RATIO)
+#define DEFAULT_VM_DIRTY_BYTES 62914560 // 60MB
+unsigned long vm_dirty_bytes, resume_vm_dirty_bytes;
+#define DEFAULT_VM_SUSPEND_DIRTY_BYTES 62914560 // 60MB
+unsigned long vm_suspend_dirty_bytes, suspend_vm_dirty_bytes;
+#else
 unsigned long vm_dirty_bytes;
+#endif
 
 /*
  * The default intervals between `kupdate'-style writebacks
@@ -1768,7 +1787,7 @@ static struct notifier_block __cpuinitdata ratelimit_nb = {
 	.next		= NULL,
 };
 
-#ifdef CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO
+#if defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO) && ! defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_BYTES)
 static void dbackground_power_suspend(struct power_suspend *handler)
 {
 	if (dirty_background_ratio != resume_dirty_background_ratio)
@@ -1791,7 +1810,7 @@ static struct power_suspend dbackground_suspend = {
 };
 #endif
 
-#ifdef CONFIG_ADAPTIVE_VM_DIRTY_RATIO
+#if defined(CONFIG_ADAPTIVE_VM_DIRTY_RATIO) && ! defined(CONFIG_ADAPTIVE_VM_DIRTY_BYTES)
 static void dratio_power_suspend(struct power_suspend *handler)
 {
 	if (vm_dirty_ratio != resume_vm_dirty_ratio)
@@ -1811,6 +1830,52 @@ static void dratio_power_resume(struct power_suspend *handler)
 static struct power_suspend dratio_suspend = {
 	.suspend = dratio_power_suspend,
 	.resume = dratio_power_resume,
+};
+#endif
+
+#if defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_BYTES) && ! defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO)
+static void dbgbytes_power_suspend(struct power_suspend *handler)
+{
+	if (dirty_background_bytes != resume_dirty_background_bytes)
+		resume_dirty_background_bytes = dirty_background_bytes;
+
+	dirty_background_bytes = suspend_dirty_background_bytes;
+}
+
+static void dbgbytes_power_resume(struct power_suspend *handler)
+{
+	if (dirty_background_bytes != suspend_dirty_background_bytes)
+		suspend_dirty_background_bytes = dirty_background_bytes;
+
+	dirty_background_bytes = resume_dirty_background_bytes;
+}
+
+static struct power_suspend dbgbytes_suspend = {
+	.suspend = dbgbytes_power_suspend,
+	.resume = dbgbytes_power_resume,
+};
+#endif
+
+#if defined(CONFIG_ADAPTIVE_VM_DIRTY_BYTES) && ! defined(CONFIG_ADAPTIVE_VM_DIRTY_RATIO)
+static void dbytes_power_suspend(struct power_suspend *handler)
+{
+	if (vm_dirty_bytes != resume_vm_dirty_bytes)
+		resume_vm_dirty_bytes = vm_dirty_bytes;
+
+	vm_dirty_bytes = suspend_vm_dirty_bytes;
+}
+
+static void dbytes_power_resume(struct power_suspend *handler)
+{
+	if (vm_dirty_bytes != suspend_vm_dirty_bytes)
+		suspend_vm_dirty_bytes = vm_dirty_bytes;
+
+	vm_dirty_bytes = resume_vm_dirty_bytes;
+}
+
+static struct power_suspend dbytes_suspend = {
+	.suspend = dbytes_power_suspend,
+	.resume = dbytes_power_resume,
 };
 #endif
 
@@ -1884,7 +1949,7 @@ static struct power_suspend dirty_suspend = {
 void __init page_writeback_init(void)
 {
 
-#ifdef CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO
+#if defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO) && ! defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_BYTES)
 	dirty_background_ratio = resume_dirty_background_ratio =
 		DEFAULT_DIRTY_BACKGROUND_RATIO;
 	dirty_suspend_background_ratio = suspend_dirty_background_ratio =
@@ -1893,13 +1958,31 @@ void __init page_writeback_init(void)
 	register_power_suspend(&dbackground_suspend);
 #endif
 
-#ifdef CONFIG_ADAPTIVE_VM_DIRTY_RATIO
+#if defined(CONFIG_ADAPTIVE_VM_DIRTY_RATIO) && ! defined(CONFIG_ADAPTIVE_VM_DIRTY_BYTES)
 	vm_dirty_ratio = resume_vm_dirty_ratio =
 		DEFAULT_VM_DIRTY_RATIO;
 	vm_suspend_dirty_ratio = suspend_vm_dirty_ratio =
 		DEFAULT_VM_SUSPEND_DIRTY_RATIO;
 
 	register_power_suspend(&dratio_suspend);
+#endif
+
+#if defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_BYTES) && ! defined(CONFIG_ADAPTIVE_DIRTY_BACKGROUND_RATIO)
+	dirty_background_bytes = resume_dirty_background_bytes =
+		DEFAULT_DIRTY_BACKGROUND_BYTES;
+	dirty_suspend_background_bytes = suspend_dirty_background_bytes =
+		DEFAULT_DIRTY_SUSPEND_BACKGROUND_BYTES;
+
+	register_power_suspend(&dbgbytes_suspend);
+#endif
+
+#if defined(CONFIG_ADAPTIVE_VM_DIRTY_BYTES) && ! defined(CONFIG_ADAPTIVE_VM_DIRTY_RATIO)
+	vm_dirty_bytes = resume_vm_dirty_bytes =
+		DEFAULT_VM_DIRTY_BYTES;
+	vm_suspend_dirty_bytes = suspend_vm_dirty_bytes =
+		DEFAULT_VM_SUSPEND_DIRTY_BYTES;
+
+	register_power_suspend(&dbytes_suspend);
 #endif
 
 #ifdef CONFIG_DYNAMIC_PAGE_WRITEBACK
