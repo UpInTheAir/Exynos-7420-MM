@@ -2054,6 +2054,7 @@ int regulator_is_enabled(struct regulator *regulator)
 }
 EXPORT_SYMBOL_GPL(regulator_is_enabled);
 
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_CAPACITIVE_BRIGHTNESS_CONTROL
 int regulator_tk_fw_hack(struct regulator *regulator)
 {
 	struct regulator_dev *rdev = regulator->rdev;
@@ -2067,6 +2068,7 @@ int regulator_tk_fw_hack(struct regulator *regulator)
 
 	return 0;
 }
+#endif
 
 /**
  * regulator_can_change_voltage - check if regulator can change voltage

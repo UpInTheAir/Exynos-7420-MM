@@ -111,12 +111,15 @@ void change_touch_key_led_voltage(struct device *dev, int vol_mv)
 		return;
 	}
 
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_CAPACITIVE_BRIGHTNESS_CONTROL
 	regulator_tk_fw_hack(tled_regulator);
+#endif
 
 	regulator_set_voltage(tled_regulator, vol_mv * 1000, vol_mv * 1000);
 	regulator_put(tled_regulator);
 }
 
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_CAPACITIVE_BRIGHTNESS_CONTROL
 static ssize_t brightness_read(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
@@ -134,6 +137,7 @@ static ssize_t brightness_read(struct device *dev,
 
 	return scnprintf(buf, PAGE_SIZE, "%d\n", vol);
 }
+#endif
 
 static ssize_t brightness_control(struct device *dev,
 				  struct device_attribute *attr,
@@ -2124,8 +2128,13 @@ static DEVICE_ATTR(touchkey_firm_version_phone, S_IRUGO | S_IWUSR | S_IWGRP,
 static DEVICE_ATTR(touchkey_firm_version_panel, S_IRUGO | S_IWUSR | S_IWGRP,
 		   set_touchkey_firm_version_read_show, NULL);
 #ifdef LED_LDO_WITH_REGULATOR
+#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_CAPACITIVE_BRIGHTNESS_CONTROL
 static DEVICE_ATTR(touchkey_brightness, S_IRUGO | S_IWUSR | S_IWGRP,
 		   brightness_read, brightness_control);
+#else
+static DEVICE_ATTR(touchkey_brightness, S_IRUGO | S_IWUSR | S_IWGRP,
+		   NULL, brightness_control);
+#endif
 #endif
 
 static DEVICE_ATTR(touchkey_recent, S_IRUGO, touchkey_diff_data0_show, NULL);
