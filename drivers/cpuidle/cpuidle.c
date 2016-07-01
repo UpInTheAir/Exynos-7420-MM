@@ -80,25 +80,21 @@ int cpuidle_enter_state(struct cpuidle_device *dev, struct cpuidle_driver *drv,
 	int entered_state;
 
 	struct cpuidle_state *target_state = &drv->states[index];
-	u64 time_start, time_end;
+	ktime_t time_start, time_end;
 	s64 diff;
 
 	exynos_ss_cpuidle(index, 0, 0, ESS_FLAG_IN);
-	time_start = local_clock();
+	time_start = ns_to_ktime(local_clock());
 
 	entered_state = target_state->enter(dev, drv, index);
 
-	time_end = local_clock();
+	time_end = ns_to_ktime(local_clock());
 	exynos_ss_cpuidle(index, entered_state,
 		(int)ktime_to_us(ktime_sub(time_end, time_start)), ESS_FLAG_OUT);
 
 	local_irq_enable();
 
-	/*
-	 * local_clock() returns the time in nanosecond, let's shift
-	 * by 10 (divide by 1024) to have microsecond based time.
-	 */
-	diff = (time_end - time_start) >> 10;
+	diff = ktime_us_delta(time_end, time_start);
 	if (diff > INT_MAX)
 		diff = INT_MAX;
 
