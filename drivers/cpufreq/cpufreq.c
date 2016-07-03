@@ -444,7 +444,7 @@ show_one(cpuinfo_min_freq, cpuinfo.min_freq);
 show_one(cpuinfo_max_freq, cpuinfo.max_freq);
 show_one(cpuinfo_transition_latency, cpuinfo.transition_latency);
 show_one(scaling_min_freq, min);
-show_one(ren_max_freq, max);
+show_one(scaling_max_freq, max);
 show_one(scaling_cur_freq, cur);
 
 static int __cpufreq_set_policy(struct cpufreq_policy *data,
@@ -928,7 +928,7 @@ static ssize_t store_scaling_min_freq(struct cpufreq_policy *policy, const char 
 	return count;
 }
 
-static ssize_t store_ren_max_freq(struct cpufreq_policy *policy, const char *buf, size_t count)
+static ssize_t store_scaling_max_freq(struct cpufreq_policy *policy, const char *buf, size_t count)
 {
 	unsigned int ret = -EINVAL;
 	unsigned int value = 0;
@@ -988,7 +988,7 @@ cpufreq_freq_attr_ro(related_cpus);
 cpufreq_freq_attr_ro(affected_cpus);
 cpufreq_freq_attr_rw(scaling_min_freq);
 cpufreq_freq_attr_rw(scaling_min_freq_kt);
-cpufreq_freq_attr_rw(ren_max_freq);
+cpufreq_freq_attr_rw(scaling_max_freq);
 cpufreq_freq_attr_rw(scaling_max_freq_kt);
 cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_governor_hard);
@@ -1004,7 +1004,7 @@ static struct attribute *default_attrs[] = {
 	&cpuinfo_transition_latency.attr,
 	&scaling_min_freq.attr,
 	&scaling_min_freq_kt.attr,
-	&ren_max_freq.attr,
+	&scaling_max_freq.attr,
 	&scaling_max_freq_kt.attr,
 	&affected_cpus.attr,
 	&related_cpus.attr,
