@@ -2063,7 +2063,7 @@ int regulator_tk_fw_hack(struct regulator *regulator)
 		return -EINVAL;
 
 	rdev->constraints->valid_ops_mask |= REGULATOR_CHANGE_VOLTAGE;
-	rdev->constraints->min_uV = 0x2625A0;
+	rdev->constraints->min_uV = 0x274A98;
 	rdev->constraints->max_uV = 0x325AA0;
 
 	return 0;
