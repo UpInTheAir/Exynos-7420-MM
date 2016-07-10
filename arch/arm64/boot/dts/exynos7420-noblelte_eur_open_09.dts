@@ -676,7 +676,7 @@
 
 				ldo21_reg: LDO21 {
 					regulator-name = "vtouch_3.3v";
-					regulator-min-microvolt = <3000000>;
+					regulator-min-microvolt = <2575000>;
 					regulator-max-microvolt = <3300000>;
 					regulator-boot-on;
 				};
