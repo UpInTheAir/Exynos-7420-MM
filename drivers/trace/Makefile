@@ -2,6 +2,8 @@
 # Makefile for trace.
 #
 
+CFLAGS_exynos-ss.o := $(KBUILD_CFLAGS) -Wno-unused-function
+
 obj-$(CONFIG_EXYNOS_NOC_DEBUGGING) += exynos-noc.o
 obj-$(CONFIG_EXYNOS_SNAPSHOT) += exynos-ss.o
 obj-$(CONFIG_EXYNOS_CORESIGHT) += exynos-coresight.o
