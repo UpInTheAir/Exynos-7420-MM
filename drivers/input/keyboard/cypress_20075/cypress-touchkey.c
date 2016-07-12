@@ -95,7 +95,7 @@ extern int get_touchkey_firmware(char *version);
 static int touchkey_led_status;
 static int touchled_cmd_reversed;
 
-#ifdef LED_LDO_WITH_REGULATOR
+//#ifdef LED_LDO_WITH_REGULATOR
 #ifndef CONFIG_KEYBOARD_CYPRESS_DSIM_BRIGHTNESS_SYNC
 static void change_touch_key_led_voltage(struct device *dev, int vol_mv)
 #else
@@ -154,7 +154,7 @@ static ssize_t brightness_control(struct device *dev,
 
 	return size;
 }
-#endif
+//#endif
 
 static int i2c_touchkey_read(struct i2c_client *client,
 		u8 reg, u8 *val, unsigned int len)
@@ -2127,7 +2127,7 @@ static DEVICE_ATTR(touchkey_firm_version_phone, S_IRUGO | S_IWUSR | S_IWGRP,
 		   set_touchkey_firm_version_show, NULL);
 static DEVICE_ATTR(touchkey_firm_version_panel, S_IRUGO | S_IWUSR | S_IWGRP,
 		   set_touchkey_firm_version_read_show, NULL);
-#ifdef LED_LDO_WITH_REGULATOR
+//#ifdef LED_LDO_WITH_REGULATOR
 #if defined(CONFIG_KEYBOARD_CYPRESS_TOUCH_CAPACITIVE_BRIGHTNESS_CONTROL) || defined(CONFIG_KEYBOARD_CYPRESS_DSIM_BRIGHTNESS_SYNC)
 static DEVICE_ATTR(touchkey_brightness, S_IRUGO | S_IWUSR | S_IWGRP,
 		   brightness_read, brightness_control);
@@ -2135,7 +2135,7 @@ static DEVICE_ATTR(touchkey_brightness, S_IRUGO | S_IWUSR | S_IWGRP,
 static DEVICE_ATTR(touchkey_brightness, S_IRUGO | S_IWUSR | S_IWGRP,
 		   NULL, brightness_control);
 #endif
-#endif
+//#endif
 
 static DEVICE_ATTR(touchkey_recent, S_IRUGO, touchkey_diff_data0_show, NULL);
 static DEVICE_ATTR(touchkey_back, S_IRUGO, touchkey_diff_data1_show, NULL);
@@ -2199,9 +2199,9 @@ static struct attribute *touchkey_attributes[] = {
 	&dev_attr_touchkey_firm_update_status.attr,
 	&dev_attr_touchkey_firm_version_phone.attr,
 	&dev_attr_touchkey_firm_version_panel.attr,
-#ifdef LED_LDO_WITH_REGULATOR
+//#ifdef LED_LDO_WITH_REGULATOR
 	&dev_attr_touchkey_brightness.attr,
-#endif
+//#endif
 	&dev_attr_touchkey_recent.attr,
 	&dev_attr_touchkey_back.attr,
 	&dev_attr_touchkey_recent_raw.attr,
@@ -2236,9 +2236,9 @@ static struct attribute *touchkey_2pads_attributes[] = {
 	&dev_attr_touchkey_firm_update_status.attr,
 	&dev_attr_touchkey_firm_version_phone.attr,
 	&dev_attr_touchkey_firm_version_panel.attr,
-#ifdef LED_LDO_WITH_REGULATOR
+//#ifdef LED_LDO_WITH_REGULATOR
 	&dev_attr_touchkey_brightness.attr,
-#endif
+//#endif
 	&dev_attr_touchkey_recent_outer.attr,
 	&dev_attr_touchkey_recent_inner.attr,
 	&dev_attr_touchkey_back_outer.attr,
