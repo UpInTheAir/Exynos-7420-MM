@@ -1099,10 +1099,16 @@ static int init_dimming(struct dsim_device *dsim, u8 * mtp, u8 * hbm)
 				dsim_info("%s init dimming info for daisy HF3 panel under C\n", __func__);
 				diminfo = (void *)dimming_info_HF3;
 				panel->inter_aor_tbl = (unsigned char *)zen_inter_aor_tbl;
+#ifdef CONFIG_KEYBOARD_CYPRESS_DSIM_BRIGHTNESS_SYNC
+				panel->tk_br_tbl = (unsigned int *)tk_br_tbl;
+#endif
 			} else {
 				dsim_info("%s init dimming info for daisy HF3 panel over D\n", __func__);
 				diminfo = (void *)dimming_info_HF3_REVD;
 				panel->inter_aor_tbl = (unsigned char *)zen_inter_aor_tbl_revd;
+#ifdef CONFIG_KEYBOARD_CYPRESS_DSIM_BRIGHTNESS_SYNC
+				panel->tk_br_tbl = (unsigned int *)tk_br_tbl;
+#endif
 			}
 			break;
 		case S6E3HF3_A3_REV01_ID:
@@ -1111,6 +1117,9 @@ static int init_dimming(struct dsim_device *dsim, u8 * mtp, u8 * hbm)
 			panel->ldu_tbl[0] = panel->br_tbl = (unsigned int *)zen_br_tbl_420_a3;
 #endif
 			panel->inter_aor_tbl = (unsigned char*)zen_inter_aor_tbl_a3;
+#ifdef CONFIG_KEYBOARD_CYPRESS_DSIM_BRIGHTNESS_SYNC
+			panel->tk_br_tbl = (unsigned int *)tk_br_tbl;
+#endif
 			break;
 		default:
 			panel->br_tbl = (unsigned int *)zen_br_tbl_420;
@@ -1124,6 +1133,9 @@ static int init_dimming(struct dsim_device *dsim, u8 * mtp, u8 * hbm)
 		memcpy(aid_dimming_dynamic.vint_dim_offset, VINT_TABLE_HF3, sizeof(aid_dimming_dynamic.vint_dim_offset));
 		memcpy(aid_dimming_dynamic.elvss_minus_offset, ELVSS_OFFSET_HF3, sizeof(aid_dimming_dynamic.elvss_minus_offset));
 		panel->hbm_inter_br_tbl = (unsigned int *)hbm_interpolation_br_tbl;
+#ifdef CONFIG_KEYBOARD_CYPRESS_DSIM_BRIGHTNESS_SYNC
+		panel->tk_br_tbl = (unsigned int *)tk_br_tbl;
+#endif
 		break;
 	default:
 		dsim_info("%s init dimming info for daisy (UNKNOWN) HA2 panel\n", __func__);
