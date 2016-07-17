@@ -42,6 +42,8 @@ enum {
 	Opt_noacl,
 	Opt_active_logs,
 	Opt_disable_ext_identify,
+	Opt_lazytime,
+	Opt_nolazytime,
 	Opt_err,
 };
 
@@ -54,6 +56,8 @@ static match_table_t f2fs_tokens = {
 	{Opt_noacl, "noacl"},
 	{Opt_active_logs, "active_logs=%u"},
 	{Opt_disable_ext_identify, "disable_ext_identify"},
+	{Opt_lazytime, "lazytime"},
+	{Opt_nolazytime, "nolazytime"},
 	{Opt_err, NULL},
 };
 
@@ -365,6 +369,12 @@ static int parse_options(struct super_block *sb, struct f2fs_sb_info *sbi,
 			break;
 		case Opt_disable_ext_identify:
 			set_opt(sbi, DISABLE_EXT_IDENTIFY);
+			break;
+		case Opt_lazytime:
+			sb->s_flags |= MS_LAZYTIME;
+			break;
+		case Opt_nolazytime:
+			sb->s_flags &= ~MS_LAZYTIME;
 			break;
 		default:
 			f2fs_msg(sb, KERN_ERR,
