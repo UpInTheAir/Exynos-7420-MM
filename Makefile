@@ -423,7 +423,7 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fdiagnostics-show-option -Werror \
 		   -pipe -fno-pic -O2 \
 		   -march=armv8-a+crc \
-		   -mtune=cortex-a57.cortex-a53 \
+		   -mtune=cortex-a57.cortex-a53 -ffast-math -ftree-vectorize \
 		   -std=gnu89
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
