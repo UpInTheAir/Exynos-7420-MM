@@ -415,10 +415,7 @@ KBUILD_CPPFLAGS := -D__KERNEL__
 KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
-		   -fmodulo-sched -fmodulo-sched-allow-regmoves \
 		   -Wno-format-security \
-		   -fivopts -funswitch-loops -fpredictive-commoning -fgcse-after-reload \
-		   -fbranch-target-load-optimize -fsingle-precision-constant \
 		   -fno-delete-null-pointer-checks \
 		   -fdiagnostics-show-option -Werror \
 		   -pipe -fno-pic -O2 \
