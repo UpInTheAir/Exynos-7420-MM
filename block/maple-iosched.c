@@ -21,7 +21,7 @@
 #include <linux/powersuspend.h>
 #endif
 
-#define MAPLE_IOSCHED_PATCHLEVEL	(5)
+#define MAPLE_IOSCHED_PATCHLEVEL	(8)
 
 enum { ASYNC, SYNC };
 
@@ -125,13 +125,13 @@ maple_expired_request(struct maple_data *mdata, int sync, int data_dir)
 static struct request *
 maple_choose_expired_request(struct maple_data *mdata)
 {
-	/* Reset (non-expired-)batch-counter */
-	mdata->batched = 0;
-
 	struct request *rq_sync_read = maple_expired_request(mdata, SYNC, READ);
 	struct request *rq_sync_write = maple_expired_request(mdata, SYNC, WRITE);
 	struct request *rq_async_read = maple_expired_request(mdata, ASYNC, READ);
 	struct request *rq_async_write = maple_expired_request(mdata, ASYNC, WRITE);
+
+	/* Reset (non-expired-)batch-counter */
+	mdata->batched = 0;
 
 	/*
 	 * Check expired requests.
@@ -163,11 +163,11 @@ maple_choose_expired_request(struct maple_data *mdata)
 static struct request *
 maple_choose_request(struct maple_data *mdata, int data_dir)
 {
-	/* Increase (non-expired-)batch-counter */
-	mdata->batched++;
-
 	struct list_head *sync = mdata->fifo_list[SYNC];
 	struct list_head *async = mdata->fifo_list[ASYNC];
+
+	/* Increase (non-expired-)batch-counter */
+	mdata->batched++;
 
 	/*
 	 * Retrieve request from available fifo list.
