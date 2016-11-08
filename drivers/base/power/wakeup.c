@@ -553,44 +553,51 @@ static void wakeup_source_activate(struct wakeup_source *ws)
 	unsigned int cec;
 
 	if (!enable_sensorhub_wl && !strcmp(ws->name, "ssp_sensorhub_wake_lock")) {
-		wakeup_source_deactivate(ws);
-		pr_info("wakeup source sensorhub activation skipped\n");
+		if (ws->active)
+			wakeup_source_deactivate(ws);
+			pr_info("wakeup source sensorhub activation skipped\n");
 		return;
 	}
 
 	if (!enable_ssp_wl && !strcmp(ws->name, "ssp_wake_lock")) {
-		wakeup_source_deactivate(ws);
-		pr_info("wakeup source ssp activation skipped\n");
+		if (ws->active)
+			wakeup_source_deactivate(ws);
+			pr_info("wakeup source ssp activation skipped\n");
 		return;
 	}
 
 	if (!enable_bcm4773_wl && !strcmp(ws->name, "bcm4773_wake_lock")) {
-		wakeup_source_deactivate(ws);
-		pr_info("wakeup source bcm4773 activation skipped\n");
+		if (ws->active)
+			wakeup_source_deactivate(ws);
+			pr_info("wakeup source bcm4773 activation skipped\n");
 		return;
 	}
 
 	if (!enable_lli_pm_wl && !strcmp(ws->name, "lli_pm_wlock")) {
-		wakeup_source_deactivate(ws);
-		pr_info("wakeup source lli_pm activation skipped\n");
+		if (ws->active)
+			wakeup_source_deactivate(ws);
+			pr_info("wakeup source lli_pm activation skipped\n");
 		return;
 	}
 
 	if (!enable_radio_interface_wl && !strcmp(ws->name, "radio-interface")) {
-		wakeup_source_deactivate(ws);
-		pr_info("wakeup source radio-interface activation skipped\n");
+		if (ws->active)
+			wakeup_source_deactivate(ws);
+			pr_info("wakeup source radio-interface activation skipped\n");
 		return;
 	}
 
 	if (!enable_umts_ipc0_wl && !strcmp(ws->name, "umts_ipc0")) {
-		wakeup_source_deactivate(ws);
-		pr_info("wakeup source umts_ipc0 activation skipped\n");
+		if (ws->active)
+			wakeup_source_deactivate(ws);
+			pr_info("wakeup source umts_ipc0 activation skipped\n");
 		return;
 	}
 
 	if (!enable_power_manager_service_wl && !strcmp(ws->name, "PowerManagerService.WakeLocks")) {
-		wakeup_source_deactivate(ws);
-		pr_info("wakeup source PowerManagerService.WakeLocks activation skipped\n");
+		if (ws->active)
+			wakeup_source_deactivate(ws);
+			pr_info("wakeup source PowerManagerService.WakeLocks activation skipped\n");
 		return;
 	}
 
