@@ -34,6 +34,7 @@ warning-2 += -Wnested-externs
 warning-2 += -Wshadow
 warning-2 += $(call cc-option, -Wlogical-op)
 warning-2 += $(call cc-option, -Wmissing-field-initializers)
+warning-2 += $(call cc-option, -Wmaybe-uninitialized)
 
 warning-3 := -Wbad-function-cast
 warning-3 += -Wcast-qual
@@ -55,4 +56,8 @@ ifeq ("$(strip $(warning))","")
 endif
 
 KBUILD_CFLAGS += $(warning)
+
+else
+
+KBUILD_CFLAGS += $(call cc-disable-warning, maybe-uninitialized)
 endif
