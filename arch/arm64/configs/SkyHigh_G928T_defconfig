@@ -1936,6 +1936,7 @@ CONFIG_UNIX98_PTYS=y
 # CONFIG_DIAG_MODE is not set
 # CONFIG_DEVMEM is not set
 # CONFIG_DEVKMEM is not set
+# CONFIG_FRANDOM is not set
 
 #
 # Serial drivers
