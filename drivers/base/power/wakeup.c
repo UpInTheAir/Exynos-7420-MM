@@ -429,7 +429,7 @@ static void wakeup_source_activate(struct wakeup_source *ws)
 		return;
 	}
 
-	if (!enable_lli_pm_wl && !strcmp(ws->name, "lli_pm_wsock")) {
+	if (!enable_lli_pm_wl && !strcmp(ws->name, "lli_pm_wlock")) {
 		pr_info("wakeup source lli_pm activation skipped\n");
 		return;
 	}
