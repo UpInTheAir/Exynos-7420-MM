@@ -30,8 +30,7 @@ config DEVKMEM
 	  When in doubt, say "N".
 
 config FRANDOM
-	bool "/dev/frandom device support"
-	default y
+	tristate "/dev/frandom device support"
 	help
 	  Say Y here if you want to support the /dev/frandom device. Frandom
 	  is a Linux kernel random number generator, which is 10-50 times faster 
