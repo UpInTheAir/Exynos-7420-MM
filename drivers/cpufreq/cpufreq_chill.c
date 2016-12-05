@@ -98,7 +98,7 @@ static void cs_check_cpu(int cpu, unsigned int load)
 			dbs_info->requested_freq = policy->min;
 
 		__cpufreq_driver_target(policy, dbs_info->requested_freq,
-				CPUFREQ_RELATION_L);
+				CPUFREQ_RELATION_C);
 		return;
 	} else if (power_suspended && load <= cs_tuners->down_threshold_suspended) {
 		unsigned int freq_target;
@@ -120,7 +120,7 @@ static void cs_check_cpu(int cpu, unsigned int load)
 			boost_counter = 0;
 		}
 		__cpufreq_driver_target(policy, dbs_info->requested_freq,
-				CPUFREQ_RELATION_L);
+				CPUFREQ_RELATION_C);
 		return;
 	}
 
@@ -143,7 +143,7 @@ static void cs_check_cpu(int cpu, unsigned int load)
 		}
 
 		__cpufreq_driver_target(policy, dbs_info->requested_freq,
-				CPUFREQ_RELATION_L);
+				CPUFREQ_RELATION_C);
 		return;
 	}
 #endif

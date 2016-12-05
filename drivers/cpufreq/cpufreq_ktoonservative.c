@@ -2815,7 +2815,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		}
 		else if (policy->min > pcpu->policy->cur)
 		{
-			__cpufreq_driver_target(pcpu->policy, policy->min, CPUFREQ_RELATION_L);
+			__cpufreq_driver_target(pcpu->policy, policy->min, CPUFREQ_RELATION_C);
 		}
 		dbs_check_cpu(pcpu);
 		mutex_unlock(&pcpu->timer_mutex);
