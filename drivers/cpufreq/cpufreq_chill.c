@@ -34,6 +34,7 @@
 #define DEF_SAMPLING_RATE			(20000)
 #define DEF_BOOST_ENABLED			(1)
 #define DEF_BOOST_COUNT				(8)
+#define DEF_IGNORE_NICE_LOAD			(0)
 
 static DEFINE_PER_CPU(struct cs_cpu_dbs_info_s, cs_cpu_dbs_info);
 
@@ -448,7 +449,7 @@ static int cs_init(struct dbs_data *dbs_data)
 	tuners->up_threshold = DEF_FREQUENCY_UP_THRESHOLD;
 	tuners->down_threshold = DEF_FREQUENCY_DOWN_THRESHOLD;
 	tuners->down_threshold_suspended = DEF_FREQUENCY_DOWN_THRESHOLD_SUSPENDED;
-	tuners->ignore_nice_load = 0;
+	tuners->ignore_nice_load = DEF_IGNORE_NICE_LOAD;
 	tuners->freq_step = DEF_FREQUENCY_STEP;
 	tuners->boost_enabled = DEF_BOOST_ENABLED;
 	tuners->boost_count = DEF_BOOST_COUNT;
