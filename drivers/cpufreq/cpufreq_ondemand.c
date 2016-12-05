@@ -114,7 +114,7 @@ static unsigned int generic_powersave_bias_target(struct cpufreq_policy *policy,
 	freq_lo = dbs_info->freq_table[index].frequency;
 	index = 0;
 	cpufreq_frequency_table_target(policy, dbs_info->freq_table, freq_avg,
-			CPUFREQ_RELATION_L, &index);
+			CPUFREQ_RELATION_C, &index);
 	freq_hi = dbs_info->freq_table[index].frequency;
 
 	/* Find out how long we have to be in hi and lo freqs */
@@ -154,7 +154,7 @@ static void dbs_freq_increase(struct cpufreq_policy *p, unsigned int freq)
 		return;
 
 	__cpufreq_driver_target(p, freq, od_tuners->powersave_bias ?
-			CPUFREQ_RELATION_L : CPUFREQ_RELATION_H);
+			CPUFREQ_RELATION_C : CPUFREQ_RELATION_H);
 }
 
 /*
@@ -192,13 +192,13 @@ static void od_check_cpu(int cpu, unsigned int load)
 
 		if (!od_tuners->powersave_bias) {
 			__cpufreq_driver_target(policy, freq_next,
-					CPUFREQ_RELATION_L);
+					CPUFREQ_RELATION_C);
 			return;
 		}
 
 		freq_next = od_ops.powersave_bias_target(policy, freq_next,
-					CPUFREQ_RELATION_L);
-		__cpufreq_driver_target(policy, freq_next, CPUFREQ_RELATION_L);
+					CPUFREQ_RELATION_C);
+		__cpufreq_driver_target(policy, freq_next, CPUFREQ_RELATION_C);
 	}
 }
 
