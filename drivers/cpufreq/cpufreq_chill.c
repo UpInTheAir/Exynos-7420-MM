@@ -12,6 +12,10 @@
  * published by the Free Software Foundation.
  */
 
+#include <linux/cpufreq.h>
+#include <linux/kernel_stat.h>
+#include <linux/module.h>
+
 #include <linux/slab.h>
 #include "cpufreq_governor.h"
 #ifdef CONFIG_POWERSUSPEND
