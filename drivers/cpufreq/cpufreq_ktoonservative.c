@@ -2448,7 +2448,7 @@ static void cpufreq_param_set_init(struct cpufreq_ktoonservative_tunables *tunab
 	tunables->disable_hotplug_chrg = 0;
 	tunables->disable_hotplug_media = 0;
 	tunables->disable_hotplug_bt = 0;
-	tunables->no_extra_cores_screen_off = 1;
+	tunables->no_extra_cores_screen_off = 0;
 	tunables->sampling_rate_min = 20000;
 	tunables->sampling_rate = 45000;
 	tunables->sampling_rate_screen_off = 40000;
