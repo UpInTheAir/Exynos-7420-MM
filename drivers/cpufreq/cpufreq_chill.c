@@ -17,6 +17,7 @@
 #include <linux/module.h>
 
 #include <linux/slab.h>
+#include <linux/tick.h>
 #include "cpufreq_governor.h"
 #ifdef CONFIG_POWERSUSPEND
 #include <linux/powersuspend.h>
@@ -35,6 +36,7 @@
 #define DEF_BOOST_ENABLED			(1)
 #define DEF_BOOST_COUNT				(8)
 #define DEF_IGNORE_NICE_LOAD			(0)
+#define MICRO_FREQUENCY_MIN_SAMPLE_RATE		(10000)
 
 static DEFINE_PER_CPU(struct cs_cpu_dbs_info_s, cs_cpu_dbs_info);
 
@@ -438,12 +440,30 @@ static struct attribute_group cs_attr_group_gov_pol = {
 
 static int cs_init(struct dbs_data *dbs_data)
 {
+	u64 idle_time;
+	int cpu;
 	struct cs_dbs_tuners *tuners;
 
 	tuners = kzalloc(sizeof(*tuners), GFP_KERNEL);
 	if (!tuners) {
 		pr_err("%s: kzalloc failed\n", __func__);
 		return -ENOMEM;
+	}
+
+	cpu = get_cpu();
+	idle_time = get_cpu_idle_time_us(cpu, NULL);
+	put_cpu();
+	if (idle_time != -1ULL) {
+		/*
+		 * In nohz/micro accounting case we set the minimum frequency
+		 * not depending on HZ, but fixed (very low). The deferred
+		 * timer might skip some samples if idle/sleeping as needed.
+		*/
+		dbs_data->min_sampling_rate = MICRO_FREQUENCY_MIN_SAMPLE_RATE;
+	} else {
+		/* For correct statistics, we need 10 ticks for each measure */
+		dbs_data->min_sampling_rate =
+			MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(10);
 	}
 
 	tuners->up_threshold = DEF_FREQUENCY_UP_THRESHOLD;
@@ -455,7 +475,6 @@ static int cs_init(struct dbs_data *dbs_data)
 	tuners->boost_count = DEF_BOOST_COUNT;
 
 	dbs_data->tuners = tuners;
-	dbs_data->min_sampling_rate = DEF_SAMPLING_RATE;
 	mutex_init(&dbs_data->mutex);
 	return 0;
 }
