@@ -371,6 +371,7 @@ struct ssp_msg {
 	u8 cmd;
 	u16 length;
 	u16 options;
+	u64 timestamp;
 	u32 data;
 
 	struct list_head list;

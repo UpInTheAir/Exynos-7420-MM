@@ -47,6 +47,7 @@
  *
 */
 #define P61_GET_SPM_STATUS    _IOR(P61_MAGIC, 0x09, unsigned int)
+#define P61_GET_ESE_ACCESS    _IOW(P61_MAGIC, 0x0A, unsigned int)
 
 struct p61_ioctl_transfer {
 	unsigned char *rx_buffer;
