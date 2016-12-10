@@ -66,127 +66,18 @@ static void get_timestamp(struct ssp_data *data, char *dataframe,
 		int *index, struct sensor_value *sensorsdata,
 		u16 batch_mode, int sensor)
 {
-	unsigned int deltaTimeUs = 0;
-	u64 deltaTimeNs = 0;
-
-	memset(&deltaTimeUs, 0, 4);
-	memcpy(&deltaTimeUs, dataframe + *index, 4);
-	//pr_info("[SSP_IDX] [%3d] TS %d]\n", sensor, deltaTimeUs);
-
-	if (deltaTimeUs > MS_IDENTIFIER) {
-		//We condsider, unit is ms (MS->NS)
-		deltaTimeNs = ((u64) (deltaTimeUs % MS_IDENTIFIER)) * U64_MS2NS;
-	} else {
-		deltaTimeNs = (((u64) deltaTimeUs) * U64_US2NS);//US->NS
-	}
-
-	// TODO: Reverse calculation of timestamp when non wake up batching.
-	if (batch_mode == BATCH_MODE_RUN) {
-		// BATCHING MODE 
-#if HIFI_NOMAL_LOG
-		ssp_dbg("[SSP_IDX] BATCH [%3d] TS %lld %lld\n", 
-			sensor, data->lastTimestamp[sensor], deltaTimeNs);
-#endif
-	// TODO: Yes, we know Hub has a bug with deltaTimeNs is set to 0
-		data->lastTimestamp[sensor] += deltaTimeNs;
-	} else {
-		// NORMAL MODE
-
-		// CAMERA SYNC MODE
-		if (data->cameraGyroSyncMode && sensor == GYROSCOPE_SENSOR) {
-			if (deltaTimeNs == 1000ULL || data->lastTimestamp[sensor] == 0ULL) {
-				data->lastTimestamp[sensor] = data->timestamp;
-				deltaTimeNs = 0ULL;
-			} else {
-				if (data->timestamp < data->lastTimestamp[sensor]) {
-					deltaTimeNs = 0ULL;
-				} else {
-					deltaTimeNs = data->timestamp - data->lastTimestamp[sensor];
-				}
-			}
-
-			if (deltaTimeNs == 0ULL) {
-				// Don't report when time is 0.
-				data->skipEventReport = true;
-				//pr_err("[SSP]: %s - report skip delta 0\n", __func__);
-			} else if (deltaTimeNs > (data->adDelayBuf[sensor] * 18ULL / 10ULL)) {
-				int cnt = 0;
-				int i = 0;
-				cnt = deltaTimeNs / (data->adDelayBuf[sensor]);
-
-				for (i = 0; i < cnt; i++) {
-					data->lastTimestamp[sensor] += data->adDelayBuf[sensor];
-					sensorsdata->timestamp = data->lastTimestamp[sensor];
-					report_sensordata(data, sensor, sensorsdata);
-					deltaTimeNs -= data->adDelayBuf[sensor];
-				}
-
-				// mod is calculated automatically.
-				if (deltaTimeNs > (data->adDelayBuf[sensor] / 2ULL)) {
-					data->lastTimestamp[sensor] += deltaTimeNs;
-					sensorsdata->timestamp = data->lastTimestamp[sensor];
-					report_sensordata(data, sensor, sensorsdata);
-					data->skipEventReport = true;
-					//pr_err("[SSP]: %s - report skip mod auto\n", __func__);
-				}
-				deltaTimeNs = 0ULL;
-			}
-			else if (deltaTimeNs < (data->adDelayBuf[sensor] / 2ULL)) {
-				data->skipEventReport = true;
-				//pr_err("[SSP]: %s - report skip delta smaller then delay\n", __func__);
-				deltaTimeNs = 0ULL;
-			}
-			data->lastTimestamp[sensor] += deltaTimeNs;
-
-		} else {
-			// 80ms is magic number. reset time base.
-			if (deltaTimeNs == 1ULL || deltaTimeNs == 80000ULL) {
-				data->lastTimestamp[sensor] = data->timestamp - 15000000ULL;
-				deltaTimeNs = 1000ULL;
-				//pr_err("[SSP_INT] first bypass data %lld\n", deltaTimeNs);
-			}
-
-			if (data->report_mode[sensor] == REPORT_MODE_ON_CHANGE) {
-				data->lastTimestamp[sensor] = data->timestamp;
-			} else {
-				/* Batching Timestamp jumped when going suspend with AP */
-				if (data->timestamp > (1000000000ULL + data->lastTimestamp[sensor])) {
-					data->lastTimestamp[sensor] = data->timestamp;
-					//pr_err("[SSP_INT] 1sec time sync %lld, e %lld l %lld\n", deltaTimeNs, data->timestamp, data->lastTimestamp[sensor]);
-				} else {
-					//pr_info("[SSP_IDX] case 3 delta%lld", deltaTimeNs);
-					if(deltaTimeNs == 0)
-						deltaTimeNs = 1000000ULL;
-					data->lastTimestamp[sensor] += deltaTimeNs;
-				}
-					
-				if(sensor == GYROSCOPE_SENSOR || sensor == GYRO_UNCALIB_SENSOR) {
-					if (sensor == GYRO_UNCALIB_SENSOR && data->bIsFirstData[GYRO_UNCALIB_SENSOR]
-							&& (atomic64_read(&data->aSensorEnable) & (1 << GYROSCOPE_SENSOR))){
-						if((data->adDelayBuf[GYROSCOPE_SENSOR] == 5000000ULL) && (data->adDelayBuf[GYRO_UNCALIB_SENSOR] == 5000000ULL)){
-							pr_err("[SSP_SYNC] uncal gyro sync to gyro sensor timestamp\n");
-							data->lastTimestamp[sensor] = data->lastTimestamp[GYROSCOPE_SENSOR] + 5000000ULL;
-						}
-					}
-					else if (sensor == GYROSCOPE_SENSOR && data->bIsFirstData[GYROSCOPE_SENSOR]
-							&& (atomic64_read(&data->aSensorEnable) & (1 << GYRO_UNCALIB_SENSOR))) {
-						if((data->adDelayBuf[GYROSCOPE_SENSOR] == 5000000ULL) && (data->adDelayBuf[GYRO_UNCALIB_SENSOR] == 5000000ULL)){
-							pr_err("[SSP_SYNC] gyro sync to uncal gyro sensor timestamp\n");
-							data->lastTimestamp[sensor] = data->lastTimestamp[GYRO_UNCALIB_SENSOR] + 5000000ULL;
-						}
-					}
-					//else
-						//pr_err("[SSP_SYNC] [%d] sensor stand alone case\n", sensor);
-				}
-			}
-		}
-	}
+	u64 mcuTimeNs = 0;
+	
+	// MCU send 8byte timestamp(ns) for time sync
+	memset(&mcuTimeNs, 0, 8);
+	memcpy(&mcuTimeNs, dataframe + *index, 8);
+	
+	data->lastTimestamp[sensor] = data->report_mode[sensor] == REPORT_MODE_ON_CHANGE && batch_mode != BATCH_MODE_RUN ? data->timestamp : mcuTimeNs;
+	
 	sensorsdata->timestamp = data->lastTimestamp[sensor];
 	data->bIsFirstData[sensor] = false;
 
-	//pr_info("[SSP_IDX] ----- [%3d] TS %lld DT %lld[AP  %5u]%lld\n", sensor, sensorsdata->timestamp, deltaTimeNs,data->ts_stacked_cnt,data->timestamp);
-
-	*index += 4;
+	*index += 8;
 }
 
 void get_sensordata(struct ssp_data *data, char *dataframe,
@@ -196,14 +87,12 @@ void get_sensordata(struct ssp_data *data, char *dataframe,
 	*index += data->data_len[sensor];
 }
 
-/*
-static void get_sensor_data(char *pchRcvDataFrame, int *iDataIdx,
-	struct sensor_value *sensorsdata, int data_size)
+bool isBatchSensor(u8 sensor_type)
 {
-	memcpy(sensorsdata, pchRcvDataFrame + *iDataIdx, data_size);
-	*iDataIdx += data_size;
+	return ((sensor_type == ACCELEROMETER_SENSOR) || (sensor_type == GEOMAGNETIC_UNCALIB_SENSOR) ||
+				(sensor_type == PRESSURE_SENSOR) || (sensor_type == GAME_ROTATION_VECTOR) || (sensor_type == BATCH_META_SENSOR));
 }
-*/
+
 bool ssp_check_buffer(struct ssp_data *data)
 {
 	int idx_data = 0;
@@ -217,11 +106,7 @@ bool ssp_check_buffer(struct ssp_data *data)
 	do{
 		sensor_type = data->batch_event.batch_data[idx_data++];
 
-		if ((sensor_type != ACCELEROMETER_SENSOR) &&
-			(sensor_type != GEOMAGNETIC_UNCALIB_SENSOR) &&
-			(sensor_type != PRESSURE_SENSOR) &&
-			(sensor_type != GAME_ROTATION_VECTOR) &&
-			(sensor_type != BATCH_META_SENSOR)) {
+		if (!isBatchSensor(sensor_type)) {
 			pr_err("[SSP]: %s - Mcu data frame1 error %d, idx_data %d\n", __func__,
 					sensor_type, idx_data - 1);
 			res = false;
@@ -246,6 +131,10 @@ bool ssp_check_buffer(struct ssp_data *data)
 			idx_data += 1;
 			break;
 		}
+		
+		// for timestamp of sensor data
+		if (sensor_type != BATCH_META_SENSOR)
+			idx_data += 4;
 
 		if(idx_data > data->batch_event.batch_length){
 			//stop index over max length
@@ -274,83 +163,54 @@ bool ssp_check_buffer(struct ssp_data *data)
 
 void ssp_batch_resume_check(struct ssp_data *data)
 {
-	u64 acc_offset = 0, uncal_mag_offset = 0, press_offset = 0, grv_offset = 0;
-	//if suspend -> wakeup case. calc. FIFO last timestamp
 	if(data->bIsResumed)
 	{
 		u8 sensor_type = 0;
-		struct sensor_value sensor_data;
-		unsigned int delta_time_us = 0;
 		int idx_data = 0;
-		u64 timestamp = get_current_timestamp();
+		int batch_index[SENSOR_MAX] = {0, };
+		u64 current_timestamp = data->timestamp;
+		u64 resume_timestamp = 0;
+		int mode = 0; // mode, 0: check batch index of each batch type sensor
+							//mode, 1: replcae timestamp of each batch type sensor
 		//pr_info("[SSP_BAT] LENGTH = %d, start index = %d ts %lld resume %lld\n", data->batch_event.batch_length, idx_data, timestamp, data->resumeTimestamp);
-
-		timestamp = data->resumeTimestamp = data->timestamp;
-		
+resume_check_loop:		
+		idx_data = 0;
 		while (idx_data < data->batch_event.batch_length)
 		{
 			sensor_type = data->batch_event.batch_data[idx_data++];
-			if(sensor_type == BATCH_META_SENSOR)	{
-				//pr_info("[SSP_BAT] get metadata %d\n", idx_data);
-				sensor_data.meta_data.sensor = data->batch_event.batch_data[idx_data++];
+			if(sensor_type == BATCH_META_SENSOR){
+				idx_data++;
 				continue;
 			}
 			
-			if ((sensor_type != ACCELEROMETER_SENSOR) &&
-				(sensor_type != GEOMAGNETIC_UNCALIB_SENSOR) &&
-				(sensor_type != PRESSURE_SENSOR) &&
-				(sensor_type != GAME_ROTATION_VECTOR)) {
-				pr_err("[SSP]: %s - Mcu data frame1 error %d, idx_data %d, data %d\n", __func__,
-						sensor_type, idx_data - 1, batch_counter);
-				data->bIsResumed = false;
-				data->resumeTimestamp = 0ULL;
-				return ;
+			if (!isBatchSensor(sensor_type)){
+				pr_err("[SSP]: %s - Mcu data frame1 error %d, idx_data %d\n", __func__,
+						sensor_type, idx_data - 1);
+				goto resume_check_end;
 			}
 			
-			//pr_info("[SSP_BAT] get data %d %d\n", sensor_type, idx_data);
-			get_sensordata(data, data->batch_event.batch_data, &idx_data,sensor_type, &sensor_data);
-
-			memset(&delta_time_us, 0, 4);
-			//pr_info("[SSP_BAT] get ts %d\n", idx_data);
-			memcpy(&delta_time_us, data->batch_event.batch_data + idx_data, 4);
-			if (delta_time_us > MS_IDENTIFIER) {
-				//We condsider, unit is ms (MS->NS)
-				delta_time_us = ((u64) (delta_time_us % MS_IDENTIFIER)) * U64_MS2NS;
-			} else {
-				delta_time_us = (((u64) delta_time_us) * U64_US2NS);//US->NS
+			idx_data += data->data_len[sensor_type];			
+			switch(mode){
+				case 0: 
+					batch_index[sensor_type]++;
+					break;
+				case 1:
+					batch_index[sensor_type]--;
+					resume_timestamp = current_timestamp - ((u64)(data->adDelayBuf[sensor_type])*batch_index[sensor_type]);
+					memcpy(data->batch_event.batch_data + idx_data, &resume_timestamp, 8);
+					//pr_info("[SSP_BAT] sensortype = %d, index = %d ts %lld delay %lld\n", sensor_type, batch_index[sensor_type], resume_timestamp, (u64)(data->adDelayBuf[sensor_type]));
+					break;
 			}
-
-			switch(sensor_type)
-			{
-				case ACCELEROMETER_SENSOR:
-					acc_offset += delta_time_us;
-					break;
-				case GEOMAGNETIC_UNCALIB_SENSOR:
-					uncal_mag_offset += delta_time_us;
-					break;
-				case GAME_ROTATION_VECTOR:
-					grv_offset += delta_time_us;
-					break;
-				case PRESSURE_SENSOR:
-					press_offset += delta_time_us;
-					break;
-				default:
-					break;				
-			}
-			idx_data += 4;
+			idx_data += 8;
 		}
-
-		if(acc_offset > 0)
-			data->lastTimestamp[ACCELEROMETER_SENSOR] = timestamp - acc_offset;
-		if(uncal_mag_offset > 0)
-			data->lastTimestamp[GEOMAGNETIC_UNCALIB_SENSOR] = timestamp - uncal_mag_offset;
-		if(press_offset > 0)
-			data->lastTimestamp[PRESSURE_SENSOR] = timestamp - press_offset;
-		if(grv_offset > 0)
-			data->lastTimestamp[GAME_ROTATION_VECTOR] = timestamp - grv_offset;
-
-		//pr_info("[SSP_BAT] resume calc. acc %lld. uncalmag %lld. pressure %lld. GRV %lld\n", acc_offset, uncal_mag_offset, press_offset, grv_offset);
+				
+		if(mode == 0){
+			mode = 1;
+			goto resume_check_loop;
+		}		
 	}
+	
+resume_check_end:
 	data->bIsResumed = false;
 	data->resumeTimestamp = 0ULL;
 }
@@ -378,10 +238,7 @@ void ssp_batch_report(struct ssp_data *data)
 			continue;
 		}
 
-		if ((sensor_type != ACCELEROMETER_SENSOR) &&
-			(sensor_type != GEOMAGNETIC_UNCALIB_SENSOR) &&
-			(sensor_type != PRESSURE_SENSOR) &&
-			(sensor_type != GAME_ROTATION_VECTOR)) {
+		if (!isBatchSensor(sensor_type)) {
 			pr_err("[SSP]: %s - Mcu data frame1 error %d, idx_data %d data %d\n", __func__,
 					sensor_type, idx_data - 1, batch_counter);
 			return ;
