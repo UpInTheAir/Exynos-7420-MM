@@ -116,7 +116,6 @@ EXPORT_SYMBOL_GPL(ehci_cf_port_reset_rwsem);
 #define HUB_DEBOUNCE_STEP	  25
 #define HUB_DEBOUNCE_STABLE	 100
 
-static void hub_release(struct kref *kref);
 static int usb_reset_and_verify_device(struct usb_device *udev);
 
 static inline char *portspeed(struct usb_hub *hub, int portstatus)
@@ -1028,6 +1027,7 @@ enum hub_activation_type {
 
 static void hub_init_func2(struct work_struct *ws);
 static void hub_init_func3(struct work_struct *ws);
+static void hub_release(struct kref *kref);
 
 static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 {
@@ -3005,14 +3005,14 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 	int		port1 = udev->portnum;
 	int		status;
 	bool		really_suspend = true;
-#ifndef CONFIG_MDM_HSIC_PM
+
 	/* enable remote wakeup when appropriate; this lets the device
 	 * wake up the upstream hub (including maybe the root hub).
 	 *
 	 * NOTE:  OTG devices may issue remote wakeup (or SRP) even when
 	 * we don't explicitly enable it here.
 	 */
-	if (udev->do_remote_wakeup) {
+	if (udev->do_remote_wakeup && !(udev->quirks & USB_QUIRK_IGNORE_REMOTE_WAKEUP)){
 		if (!hub_is_superspeed(hub->hdev)) {
 			status = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 					USB_REQ_SET_FEATURE, USB_RECIP_DEVICE,
@@ -3042,7 +3042,7 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 				goto err_wakeup;
 		}
 	}
-#endif
+
 	/* disable USB2 hardware LPM */
 	if (udev->usb2_hw_lpm_enabled == 1)
 		usb_set_usb2_hardware_lpm(udev, 0);
@@ -3076,12 +3076,11 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 	 * descendants is enabled for remote wakeup.
 	 */
 	else if (PMSG_IS_AUTO(msg) || wakeup_enabled_descendants(udev) > 0) {
-#ifdef CONFIG_MDM_HSIC_PM
-		status = 0;
-#else
-		status = set_port_feature(hub->hdev, port1,
-				USB_PORT_FEAT_SUSPEND);
-#endif
+		if (udev->quirks & USB_QUIRK_IGNORE_REMOTE_WAKEUP)
+			status = 0;
+		else
+			status = set_port_feature(hub->hdev, port1,
+					USB_PORT_FEAT_SUSPEND);
 	} else {
 		really_suspend = false;
 		status = 0;
@@ -3113,9 +3112,7 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 						USB_INTRF_FUNC_SUSPEND, 0,
 						NULL, 0, USB_CTRL_SET_TIMEOUT);
 		}
-#ifndef CONFIG_MDM_HSIC_PM
 err_wakeup:
-#endif
 
 		/* System sleep transitions should never fail */
 		if (!PMSG_IS_AUTO(msg))
