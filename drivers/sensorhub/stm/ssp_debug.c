@@ -409,15 +409,12 @@ static void print_sensordata(struct ssp_data *data, unsigned int uSensor)
 
 static void recovery_mcu(struct ssp_data *data)
 {
-	if (data->uComFailCnt < LIMIT_RESET_CNT) {
-		ssp_infof("- uTimeOutCnt(%u), pending(%u)",
-			data->uTimeOutCnt, !list_empty(&data->pending_list));
-		data->uComFailCnt++;
-		reset_mcu(data);
-	} else {
-		ssp_enable(data, false);
-	}
-
+	ssp_infof("- uTimeOutCnt(%u), pending(%u)",
+		data->uTimeOutCnt, !list_empty(&data->pending_list));
+		
+	data->uComFailCnt++;
+	reset_mcu(data);
+	
 	data->uTimeOutCnt = 0;
 }
 
