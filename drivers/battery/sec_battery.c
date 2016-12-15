@@ -1718,7 +1718,7 @@ static void sec_bat_mix_temperature_check(
 				(battery->temperature >= mix_high_tbat) &&
 				(battery->chg_temp >= mix_high_tchg)) {
 				battery->mix_limit = SEC_BATTERY_MIX_TEMP_HIGH;
-				value.intval = battery->pdata->mix_input_limit_current;
+				value.intval = mix_input_limit_current;
 				psy_do_property(battery->pdata->charger_name, set,
 						POWER_SUPPLY_PROP_CURRENT_MAX, value);
 				dev_info(battery->dev,"%s: Input current is reduced by Temp(tbat:%d, tchg:%d)\n",
