@@ -505,11 +505,31 @@ conn_gadget_function_bind_config(struct android_usb_function *f,
 	return conn_gadget_bind_config(c);
 }
 
+static DEVICE_ATTR(usb_buffer_size, S_IRUGO | S_IWUSR,
+	conn_gadget_usb_buffer_size_show,
+	conn_gadget_usb_buffer_size_store);
+
+static DEVICE_ATTR(out_max_packet_size, S_IRUGO | S_IWUSR,
+	conn_gadget_out_max_packet_size_show,
+	conn_gadget_out_max_packet_size_store);
+
+static DEVICE_ATTR(in_max_packet_size, S_IRUGO | S_IWUSR,
+	conn_gadget_in_max_packet_size_show,
+	conn_gadget_in_max_packet_size_store);
+
+static struct device_attribute *conn_gadget_function_attributes[] = {
+	&dev_attr_usb_buffer_size, 
+	&dev_attr_out_max_packet_size,
+	&dev_attr_in_max_packet_size,
+	NULL
+};
+
 static struct android_usb_function conn_gadget_function = {
 	.name = "conn_gadget",
 	.init = conn_gadget_function_init,
 	.cleanup = conn_gadget_function_cleanup,
 	.bind_config = conn_gadget_function_bind_config,
+	.attributes	= conn_gadget_function_attributes,
 };
 #endif
 
@@ -2195,6 +2215,13 @@ static int android_usb_unbind(struct usb_composite_dev *cdev)
 	return 0;
 }
 
+static void android_gadget_complete(struct usb_ep *ep, struct usb_request *req)
+{
+	if(req->status || req->actual != req->length)
+			printk(KERN_DEBUG "usb: %s: %d, %d/%d\n", __func__,
+				req->status, req->actual, req->length);
+}
+
 /* HACK: android needs to override setup for accessory to work */
 static int (*composite_setup_func)(struct usb_gadget *gadget, const struct usb_ctrlrequest *c);
 
@@ -2211,6 +2238,8 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 	req->zero = 0;
 	req->length = 0;
 	gadget->ep0->driver_data = cdev;
+
+	req->complete = android_gadget_complete;
 
 	list_for_each_entry(f, &dev->enabled_functions, enabled_list) {
 		if (f->ctrlrequest) {
