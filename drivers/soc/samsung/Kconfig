@@ -1,0 +1,17 @@
+#
+# EXYNOS Soc drivers
+#
+menu "SOC (System On Chip) specific Drivers"
+
+menuconfig SOC_SAMSUNG
+	bool "SAMSUNG SOC drivers support"
+
+if SOC_SAMSUNG
+
+config STATE_NOTIFIER
+        bool "State Notifier"
+
+endif #SOC_SAMSUNG
+
+endmenu
+
