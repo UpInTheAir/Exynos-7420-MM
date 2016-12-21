@@ -4103,6 +4103,12 @@ CONFIG_EXYNOS7420_BTS=y
 # CONFIG_ICE5_FPGA_LED_MATRIX is not set
 
 #
+# SOC (System On Chip) specific Drivers
+#
+CONFIG_SOC_SAMSUNG=y
+CONFIG_STATE_NOTIFIER=y
+
+#
 # File systems
 #
 CONFIG_DCACHE_WORD_ACCESS=y
