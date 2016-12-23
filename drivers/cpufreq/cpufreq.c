@@ -2309,7 +2309,12 @@ EXPORT_SYMBOL(cpufreq_update_policy);
 
 void cpufreq_gov_resume(void)
 {
-	if (Lscreen_off_scaling_enable == 1)
+	if (ktoonservative_is_active)
+	{
+		pr_alert("KT GOT SCREEN OFF\n");
+		ktoonservative_screen_is_on(true, 0);
+	}
+	else if (Lscreen_off_scaling_enable == 1)
 	{
 		if (vfreq_lock == 1)
 		{
@@ -2321,20 +2326,16 @@ void cpufreq_gov_resume(void)
 		set_cpu_min_max(0, Lscreen_off_scaling_mhz_orig_cl1, 4, 4, 0, hotplug_data_cl1);
 		//pr_alert("CPUFREQ_GOV_RESUME_FREQ-CL1: %u\n", Lscreen_off_scaling_mhz_orig_cl1);
 	}
-	else
-	{
-		if (ktoonservative_is_active)
-		{
-			pr_alert("KT GOT SCREEN OFF\n");
-			ktoonservative_screen_is_on(true, 0);
-		}
-		screen_is_on = true;
-	}
 }
 
 void cpufreq_gov_suspend(void)
 {
-	if (Lscreen_off_scaling_enable == 1)
+	if (ktoonservative_is_active)
+	{
+		pr_alert("KT GOT SCREEN ON\n");
+		ktoonservative_screen_is_on(false, 0);
+	}
+	else if (Lscreen_off_scaling_enable == 1)
 	{
 		if (vfreq_lock == 1)
 		{
@@ -2346,19 +2347,11 @@ void cpufreq_gov_suspend(void)
 		set_cpu_min_max(0, Lscreen_off_scaling_mhz_cl1, 4, 4, 1, hotplug_data_cl1);
 		//pr_alert("CPUFREQ_GOV_SUSPEND_FREQ-CL1: %u\n", Lscreen_off_scaling_mhz_cl1);
 	}
-	else
-	{
-		if (ktoonservative_is_active)
-		{
-			pr_alert("KT GOT SCREEN ON\n");
-			ktoonservative_screen_is_on(false, 0);
-		}
-		screen_is_on = false;
-	}
 }
 
 void cpufreq_screen_is_on(bool state)
 {
+	screen_is_on = state;
 	if (state)
 		cpufreq_gov_resume();
 	else
