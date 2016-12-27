@@ -4149,7 +4149,7 @@ CONFIG_MSM_QMI_INTERFACE=y
 # SOC (System On Chip) specific Drivers
 #
 CONFIG_SOC_SAMSUNG=y
-CONFIG_STATE_NOTIFIER=y
+# CONFIG_STATE_NOTIFIER is not set
 
 #
 # File systems
