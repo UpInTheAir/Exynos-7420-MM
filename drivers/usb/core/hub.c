@@ -3005,7 +3005,7 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 	int		port1 = udev->portnum;
 	int		status;
 	bool		really_suspend = true;
-#ifndef CONFIG_MDM_HSIC_PM
+
 	/* enable remote wakeup when appropriate; this lets the device
 	 * wake up the upstream hub (including maybe the root hub).
 	 *
@@ -3013,7 +3013,7 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 	 * we don't explicitly enable it here.
 	 */
 	if (udev->do_remote_wakeup) {
-		if (!hub_is_superspeed(hub->hdev)) {
+		if (udev->do_remote_wakeup && !(udev->quirks & USB_QUIRK_IGNORE_REMOTE_WAKEUP)){
 			status = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 					USB_REQ_SET_FEATURE, USB_RECIP_DEVICE,
 					USB_DEVICE_REMOTE_WAKEUP, 0,
@@ -3042,7 +3042,7 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 				goto err_wakeup;
 		}
 	}
-#endif
+
 	/* disable USB2 hardware LPM */
 	if (udev->usb2_hw_lpm_enabled == 1)
 		usb_set_usb2_hardware_lpm(udev, 0);
@@ -3076,12 +3076,11 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 	 * descendants is enabled for remote wakeup.
 	 */
 	else if (PMSG_IS_AUTO(msg) || wakeup_enabled_descendants(udev) > 0) {
-#ifdef CONFIG_MDM_HSIC_PM
-		status = 0;
-#else
-		status = set_port_feature(hub->hdev, port1,
-				USB_PORT_FEAT_SUSPEND);
-#endif
+		if (udev->quirks & USB_QUIRK_IGNORE_REMOTE_WAKEUP)
+			status = 0;
+		else
+			status = set_port_feature(hub->hdev, port1,
+					USB_PORT_FEAT_SUSPEND);
 	} else {
 		really_suspend = false;
 		status = 0;
@@ -3113,9 +3112,7 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 						USB_INTRF_FUNC_SUSPEND, 0,
 						NULL, 0, USB_CTRL_SET_TIMEOUT);
 		}
-#ifndef CONFIG_MDM_HSIC_PM
 err_wakeup:
-#endif
 
 		/* System sleep transitions should never fail */
 		if (!PMSG_IS_AUTO(msg))
