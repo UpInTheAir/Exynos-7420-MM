@@ -3397,12 +3397,14 @@ static void set_wirelesscharger_mode(void *device_data)
 	set_default_result(info);
 
 	if (info->touch_stopped) {
+		info->wirelesscharger_mode = info->cmd_param[0];
+
 		tsp_debug_info(true, &info->client->dev, "%s: [ERROR] Touch is stopped\n",
 			__func__);
 		snprintf(buff, sizeof(buff), "%s", "TSP turned off");
 		set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
 		info->cmd_state = CMD_STATUS_NOT_APPLICABLE;
-		return;
+		goto out;
 	}
 
 	if (info->cmd_param[0] < 0 || info->cmd_param[0] > 1) {
@@ -3421,11 +3423,12 @@ static void set_wirelesscharger_mode(void *device_data)
 		info->cmd_state = CMD_STATUS_OK;
 	}
 	set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
+	info->cmd_state = CMD_STATUS_WAITING;
 
+out:
 	mutex_lock(&info->cmd_lock);
 	info->cmd_is_running = false;
 	mutex_unlock(&info->cmd_lock);
-	info->cmd_state = CMD_STATUS_WAITING;
 
 	tsp_debug_info(true, &info->client->dev, "%s: %s\n", __func__, buff);
 };
