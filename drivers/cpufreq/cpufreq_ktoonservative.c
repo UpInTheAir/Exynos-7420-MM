@@ -1609,6 +1609,7 @@ static const char *ktoonservative_sysfs[] = {
 	"touch_boost_cpu_cl1",
 	"touch_boost_core_1",
 	"touch_boost_core_2",
+	"touch_boost_core_3",
 	"touch_boost_core_4",
 	"touch_boost_core_5",
 	"touch_boost_core_6",
