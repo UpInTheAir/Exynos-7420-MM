@@ -45,6 +45,9 @@ CONFIG_ATOMIC64_SELFTEST=y
 # CONFIG_SEC_RESTRICT_SETUID is not set
 # CONFIG_SEC_RESTRICT_FORK is not set
 # CONFIG_SEC_RESTRICT_ROOTING_LOG is not set
+#
+# UFS Journal Data Tag Debug
+CONFIG_JOURNAL_DATA_TAG_DEBUG=y
 
 #
 # Common Clock Framework
