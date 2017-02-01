@@ -246,29 +246,16 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 HOSTCC       = $(CCACHE) gcc
 HOSTCXX      = $(CCACHE) g++
 
-GRAPHITE   = -fgraphite-identity -floop-parallelize-all -ftree-loop-linear -floop-interchange -floop-strip-mine -floop-block -floop-flatten -floop-nest-optimize
-
-ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu89
-HOSTCXXFLAGS = -O2
-endif
-ifdef CONFIG_CC_OPTIMIZE_DEFAULT
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu89
-HOSTCXXFLAGS = -O2
-endif
-ifdef CONFIG_CC_OPTIMIZE_MORE
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O3 -fomit-frame-pointer -std=gnu89
-HOSTCXXFLAGS = -O3 fgcse-las
-endif
-ifdef CONFIG_CC_OPTIMIZE_FAST
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -Ofast -fomit-frame-pointer -std=gnu89
-HOSTCXXFLAGS = -Ofast
-endif
-
 ifdef CONFIG_CC_GRAPHITE_OPTIMIZATION
-HOSTCFLAGS   = $(GRAPHITE)
-HOSTCXXFLAGS = $(GRAPHITE)
+GRAPHITE     = -fgraphite -fgraphite-identity -floop-flatten -floop-parallelize-all -ftree-loop-linear -floop-interchange -floop-strip-mine -floop-block -floop-nest-optimize
+else
+GRAPHITE     =
 endif
+
+KERNEL_FLAGS = -g0 -DNDEBUG -pipe -fno-pic -O2 -mcpu=cortex-a57.cortex-a53+crypto+crc -mtune=cortex-a57.cortex-a53 -ffast-math -ftree-vectorize
+
+HOSTCFLAGS   = $(GRAPHITE) -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu89
+HOSTCXXFLAGS = $(GRAPHITE) $(KERNEL_FLAGS)
 
 # Decide whether to build built-in, modular, or both.
 # Normally, just do built-in.
@@ -351,13 +338,9 @@ include $(srctree)/scripts/Kbuild.include
 # Make variables (CC, etc...)
 
 AS		= $(CROSS_COMPILE)as
-LD		= $(CROSS_COMPILE)ld
-CC		= $(CCACHE) $(CROSS_COMPILE)gcc
+LD		= $(CROSS_COMPILE)ld -O2 --strip-debug
+CC		= $(CCACHE) $(CROSS_COMPILE)gcc $(GRAPHITE)
 CPP		= $(CC) -E
-ifdef CONFIG_CC_GRAPHITE_OPTIMIZATION
-CC		+= $(GRAPHITE)
-CPP		+= $(GRAPHITE)
-endif
 AR		= $(CROSS_COMPILE)ar
 NM		= $(CROSS_COMPILE)nm
 STRIP		= $(CROSS_COMPILE)strip
@@ -382,16 +365,12 @@ endif
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
-CFLAGS_MODULE   =
-AFLAGS_MODULE   =
-LDFLAGS_MODULE  =
-CFLAGS_KERNEL	=
-ifdef CONFIG_CC_GRAPHITE_OPTIMIZATION
+CFLAGS_MODULE	= $(GRAPHITE)
+AFLAGS_MODULE	= $(GRAPHITE)
+LDFLAGS_MODULE	= --strip-debug
 CFLAGS_KERNEL	= $(GRAPHITE)
-endif
-AFLAGS_KERNEL	=
+AFLAGS_KERNEL	= $(GRAPHITE)
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage -fno-tree-loop-im -Wno-maybe-uninitialized
-
 
 # Use USERINCLUDE when you must reference the UAPI directories only.
 USERINCLUDE    := \
@@ -412,16 +391,15 @@ LINUXINCLUDE    := \
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 
-KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
+KBUILD_CFLAGS   := $(GRAPHITE) -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
 		   -fno-delete-null-pointer-checks \
 		   -fdiagnostics-show-option -Werror \
-		   -pipe -fno-pic -O2 \
-		   -march=armv8-a+crc \
-		   -mtune=cortex-a57.cortex-a53 -ffast-math -ftree-vectorize \
+		   $(KERNEL_FLAGS) \
 		   -std=gnu89
+
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
 KBUILD_AFLAGS   := -D__ASSEMBLY__
@@ -621,19 +599,9 @@ all: vmlinux
 KBUILD_CFLAGS	+= $(call cc-disable-warning,frame-address,)
 
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
-KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
-endif
-ifdef CONFIG_CC_OPTIMIZE_DEFAULT
+KBUILD_CFLAGS	+= -Os
+else
 KBUILD_CFLAGS	+= -O2
-endif
-ifdef CONFIG_CC_OPTIMIZE_MORE
-KBUILD_CFLAGS	+= -O3
-endif
-ifdef CONFIG_CC_OPTIMIZE_FAST
-KBUILD_CFLAGS	+= -Ofast
-endif
-ifdef CONFIG_CC_GRAPHITE_OPTIMIZATION
-KBUILD_CFLAGS	+= $(GRAPHITE)
 endif
 
 KBUILD_CFLAGS += $(call cc-ifversion, -lt, 0409, \

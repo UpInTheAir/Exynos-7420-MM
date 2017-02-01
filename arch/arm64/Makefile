@@ -10,19 +10,27 @@
 #
 # Copyright (C) 1995-2001 by Russell King
 
-LDFLAGS_vmlinux	:=-p --no-undefined -X
+LDFLAGS_vmlinux	:= -p --no-undefined -X
 CPPFLAGS_vmlinux.lds = -DTEXT_OFFSET=$(TEXT_OFFSET)
-OBJCOPYFLAGS	:=-O binary -R .note -R .note.gnu.build-id -R .comment -S
-GZFLAGS		:=-9
+OBJCOPYFLAGS	:= -O binary -R .note -R .note.gnu.build-id -R .comment -S
+GZFLAGS		:= -9
 
 KBUILD_DEFCONFIG := defconfig
 
+ifdef CONFIG_CC_GRAPHITE_OPTIMIZATION
+GRAPHITE	:= -fgraphite -fgraphite-identity -floop-flatten -floop-parallelize-all -ftree-loop-linear -floop-interchange -floop-strip-mine -floop-block -floop-nest-optimize
+else
+GRAPHITE	:=
+endif
+
+KERNEL_FLAGS	:= -g0 -DNDEBUG -pipe -fno-pic -O2 -mcpu=cortex-a57.cortex-a53+crypto+crc -mtune=cortex-a57.cortex-a53 -ffast-math -ftree-vectorize
+
 KBUILD_CFLAGS	+= -mgeneral-regs-only
 KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
-KBUILD_CFLAGS	+= -fno-pic
+KBUILD_CFLAGS	+= $(GRAPHITE) $(KERNEL_FLAGS)
 
 ifeq ($(CONFIG_CC_STACKPROTECTOR),y)
-KBUILD_CFLAGS	+=-fstack-protector-all
+KBUILD_CFLAGS	+= -fstack-protector-all
 endif
 
 ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
