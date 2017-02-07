@@ -712,7 +712,7 @@ static void cmd_get_threshold(void *device_data)
 	char buf[64] = { 0 };
 
 	cmd_clear_result(info);
-	sprintf(buf, "55");
+		sprintf(buf, "55");
 	cmd_set_result(info, buf, strnlen(buf, sizeof(buf)));
 
 	info->cmd_state = CMD_STATUS_OK;
@@ -862,7 +862,7 @@ static void dead_zone_enable(void *device_data)
 	if ((enable == 0) || (enable == 1)) {
 		if (mms_i2c_write(info, wbuf, 3)) {
 			tsp_debug_err(true, &info->client->dev, "%s [ERROR] mms_i2c_write\n", __func__);
-			goto out;
+		goto out;
 		} else
 			tsp_debug_info(true, &info->client->dev, "%s - value[%d]\n", __func__, wbuf[2]);
 	} else {
@@ -976,7 +976,12 @@ static ssize_t mms_sys_cmd(struct device *dev, struct device_attribute *devattr,
 	if (!info) {
 		pr_err("%s [ERROR] mms_ts_info not found\n", __func__);
 		ret = -EINVAL;
-		goto ERROR;
+	}
+
+	if (strlen(buf) >= CMD_LEN) { 
+		input_err(true, &info->client->dev, "%s: cmd length is over (%s,%d)!!\n", __func__, buf, (int)strlen(buf)); 
+		ret = -EINVAL;
+		goto ERROR; 
 	}
 
 	tsp_debug_dbg(true, &info->client->dev, "%s [START]\n", __func__);
@@ -1054,7 +1059,7 @@ static ssize_t mms_sys_cmd(struct device *dev, struct device_attribute *devattr,
 				param_cnt++;
 			}
 			cur++;
-		} while (cur - buf <= len);
+		} while ((cur - buf <= len) && (param_cnt < CMD_PARAM_NUM));
 	}
 
 	//print
