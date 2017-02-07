@@ -252,7 +252,7 @@ else
 GRAPHITE     =
 endif
 
-KERNEL_FLAGS = -g0 -DNDEBUG -pipe -fno-pic -O2 -mcpu=cortex-a57.cortex-a53+crypto+crc -mtune=cortex-a57.cortex-a53 -ffast-math -ftree-vectorize
+KERNEL_FLAGS = -g0 -DNDEBUG -pipe -fno-pic -O2 -mcpu=cortex-a57.cortex-a53+crypto+crc -ffast-math -ftree-vectorize
 
 HOSTCFLAGS   = $(GRAPHITE) -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu89
 HOSTCXXFLAGS = $(GRAPHITE) $(KERNEL_FLAGS)
