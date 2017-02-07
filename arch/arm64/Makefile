@@ -23,7 +23,7 @@ else
 GRAPHITE	:=
 endif
 
-KERNEL_FLAGS	:= -g0 -DNDEBUG -pipe -fno-pic -O2 -mcpu=cortex-a57.cortex-a53+crypto+crc -mtune=cortex-a57.cortex-a53 -ffast-math -ftree-vectorize
+KERNEL_FLAGS	:= -g0 -DNDEBUG -pipe -fno-pic -O2 -mcpu=cortex-a57.cortex-a53+crypto+crc -ffast-math -ftree-vectorize
 
 KBUILD_CFLAGS	+= -mgeneral-regs-only
 KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
