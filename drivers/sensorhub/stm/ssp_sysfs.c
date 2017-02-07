@@ -1067,6 +1067,11 @@ static long ssp_batch_ioctl(struct file *file, unsigned int cmd,
 
 	sensor_type = (cmd & 0xFF);
 
+	if(sensor_type >= SENSOR_MAX){
+		pr_err("[SSP] Invalid sensor_type %d\n", sensor_type);
+		return -EINVAL;
+	}
+
 	if ((cmd >> 8 & 0xFF) != BATCH_IOCTL_MAGIC) {
 		ssp_err("Invalid BATCH CMD %x", cmd);
 		return -EINVAL;
