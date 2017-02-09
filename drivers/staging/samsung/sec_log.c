@@ -32,9 +32,7 @@ extern int rkp_support_large_memory;
  */
 #define LOG_MAGIC 0x4d474f4c	/* "LOGM" */
 
-// [ SEC_SELINUX_PORTING EXYNOS
 #ifdef CONFIG_SEC_AVC_LOG
-// ] SEC_SELINUX_PORTING EXYNOS
 static unsigned *sec_avc_log_ptr;
 static char *sec_avc_log_buf;
 static unsigned sec_avc_log_size;
@@ -208,9 +206,7 @@ static int __init sec_avc_log_late_init(void)
 
 late_initcall(sec_avc_log_late_init);
 
-// [ SEC_SELINUX_PORTING EXYNOS
 #endif /* CONFIG_SEC_AVC_LOG */
-// ] SEC_SELINUX_PORTING EXYNOS
 
 
 #ifdef CONFIG_SEC_DEBUG_TSP_LOG
@@ -320,6 +316,40 @@ void sec_debug_tsp_log(char *fmt, ...)
 }
 EXPORT_SYMBOL(sec_debug_tsp_log);
 
+void sec_debug_tsp_log_msg(char *msg, char *fmt, ...)
+{
+	va_list args;
+	char buf[TSP_BUF_SIZE];
+	int len = 0;
+	unsigned int idx;
+	unsigned int size;
+	unsigned int size_dev_name;
+
+	/* In case of sec_tsp_log_setup is failed */
+	if (!sec_tsp_log_size)
+		return;
+	va_start(args, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+
+	idx = *sec_tsp_log_ptr;
+	size = strlen(buf);
+	size_dev_name = strlen(msg);
+
+	idx = sec_tsp_log_timestamp(idx);
+
+	/* Overflow buffer size */
+	if (idx + size + size_dev_name + 3 + 1 > sec_tsp_log_size) {
+		len = scnprintf(&sec_tsp_log_buf[0],
+						size + size_dev_name + 3 + 1, "%s : %s", msg, buf);
+		*sec_tsp_log_ptr = len;
+	} else {
+		len = scnprintf(&sec_tsp_log_buf[idx], size + size_dev_name + 3 + 1, "%s : %s", msg, buf);
+		*sec_tsp_log_ptr += len;
+	}
+}
+EXPORT_SYMBOL(sec_debug_tsp_log_msg);
+
 static ssize_t sec_tsp_log_write(struct file *file,
 					     const char __user *buf,
 					     size_t count, loff_t *ppos)
@@ -410,25 +440,17 @@ static char *last_kmsg_buffer;
 static size_t last_kmsg_size;
 void sec_debug_save_last_kmsg(unsigned char* head_ptr, unsigned char* curr_ptr)
 {
-	size_t size;
-
 	if (head_ptr == NULL || curr_ptr == NULL || head_ptr == curr_ptr) {
 		pr_err("%s: no data \n", __func__);
 		return;
 	}
 
-	size = (size_t)(curr_ptr - head_ptr);
-	if (size <= 0) {
-		pr_err("%s: invalid args \n", __func__);
-		return;
-	}
-
 	/* provide previous log as last_kmsg */
-	last_kmsg_size = min((size_t)(1 << CONFIG_LOG_BUF_SHIFT), size);
+	last_kmsg_size = (size_t)(1 << CONFIG_LOG_BUF_SHIFT);
 	last_kmsg_buffer = (char *)kzalloc(last_kmsg_size, GFP_NOWAIT);
 
 	if (last_kmsg_size && last_kmsg_buffer) {
-		memcpy(last_kmsg_buffer, curr_ptr-last_kmsg_size, last_kmsg_size);
+		memcpy(last_kmsg_buffer, head_ptr, last_kmsg_size);
 		pr_info("%s: successed\n", __func__);
 	} else
 		pr_err("%s: failed\n", __func__);

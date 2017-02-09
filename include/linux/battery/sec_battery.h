@@ -42,7 +42,9 @@
 #if defined(CONFIG_USB_EXTERNAL_NOTIFY)
 #include <linux/usb_notify.h>
 #endif
-
+#if defined(CONFIG_BATTERY_CISD)
+#include <linux/battery/sec_cisd.h>
+#endif
 #include <linux/sec_batt.h>
 
 #if defined(CONFIG_CHARGING_VZWCONCEPT)
@@ -56,6 +58,9 @@
 #define ADC_CH_COUNT		10
 #define ADC_SAMPLE_COUNT	10
 #define BATT_MISC_EVENT_UNDEFINED_RANGE_TYPE	0x00000001
+
+#define SEC_INPUT_VOLTAGE_5V	5
+#define SEC_INPUT_VOLTAGE_9V	9
 
 struct adc_sample_info {
 	unsigned int cnt;
@@ -129,6 +134,10 @@ struct sec_battery_info {
 	struct alarm event_termination_alarm;
 
 	ktime_t	last_event_time;
+
+#if defined(CONFIG_BATTERY_CISD)
+	struct cisd cisd;
+#endif
 
 	/* battery check */
 	unsigned int check_count;
@@ -237,8 +246,6 @@ struct sec_battery_info {
 	int stability_test;
 	int eng_not_full_status;
 
-	bool skip_chg_temp_check;
-	bool skip_wpc_temp_check;
 #if defined(CONFIG_BATTERY_SWELLING_SELF_DISCHARGING)
 	bool factory_self_discharging_mode_on;
 	bool force_discharging;
@@ -276,6 +283,9 @@ struct sec_battery_info {
 	unsigned int prev_misc_event;
 	struct delayed_work misc_event_work;
 	struct wake_lock misc_event_wake_lock;
+
+	unsigned long lcd_on_total_time;
+	unsigned long lcd_on_time;
 };
 
 ssize_t sec_bat_show_attrs(struct device *dev,
@@ -322,6 +332,7 @@ enum {
 
 	BATT_CURRENT_UA_NOW,
 	BATT_CURRENT_UA_AVG,
+	BATT_FILTER_CFG,
 
 	BATT_TEMP,
 	BATT_TEMP_ADC,
@@ -440,6 +451,10 @@ enum {
 	CAMERA_TEMP,
 	CAMERA_LIMIT,
 	BATT_MISC_EVENT,
+	CISD_FULLCAPREP_MAX,
+#if defined(CONFIG_BATTERY_CISD)
+	CISD_DATA,
+#endif
 };
 
 #ifdef CONFIG_OF
@@ -448,4 +463,8 @@ extern void adc_init(struct platform_device *pdev, struct sec_battery_info *batt
 extern void adc_exit(struct sec_battery_info *battery);
 #endif
 
+#if defined(CONFIG_BATTERY_CISD)
+extern bool sec_bat_cisd_check(struct sec_battery_info *battery);
+extern void sec_battery_cisd_init(struct sec_battery_info *battery);
+#endif
 #endif /* __SEC_BATTERY_H */

@@ -1,7 +1,7 @@
 /*
  * Linux cfg80211 driver
  *
- * Copyright (C) 1999-2015, Broadcom Corporation
+ * Copyright (C) 1999-2016, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfg80211.h 605425 2015-12-10 08:49:36Z $
+ * $Id: wl_cfg80211.h 667534 2016-10-27 13:19:42Z $
  */
 
 /**
@@ -548,6 +548,21 @@ typedef struct wl_if_event_info {
 #define GET_BSS_INFO_LEN 90
 #endif /* DHD_ENABLE_BIGDATA_LOGGING */
 
+#ifdef WES_SUPPORT
+#ifdef CUSTOMER_SCAN_TIMEOUT_SETTING
+#define DEFAULT_SCAN_CHANNEL_TIME	40
+#define DEFAULT_SCAN_HOME_TIME	45
+#define DEFAULT_SCAN_HOME_AWAY_TIME	100
+#define CUSTOMER_WL_SCAN_TIMER_INTERVAL_MS	25000 /* Scan timeout */
+enum wl_custom_scan_time_type {
+	WL_CUSTOM_SCAN_CHANNEL_TIME = 0,
+	WL_CUSTOM_SCAN_HOME_TIME,
+	WL_CUSTOM_SCAN_HOME_AWAY_TIME
+};
+extern s32 wl_cfg80211_custom_scan_time(enum wl_custom_scan_time_type type, int time);
+#endif /* CUSTOMER_SCAN_TIMEOUT_SETTING */
+#endif /* WES_SUPPORT */
+
 /* private data of cfg80211 interface */
 struct bcm_cfg80211 {
 	struct wireless_dev *wdev;	/* representing cfg cfg80211 device */
@@ -657,6 +672,9 @@ struct bcm_cfg80211 {
 	struct mutex event_sync;	/* maily for up/down synchronization */
 	bool disable_roam_event;
 	struct delayed_work pm_enable_work;
+	struct workqueue_struct *event_workq;   /* workqueue for event */
+	struct work_struct event_work;		/* work item for event */
+
 	vndr_ie_setbuf_t *ibss_vsie;	/* keep the VSIE for IBSS */
 	int ibss_vsie_len;
 #ifdef WLAIBSS
@@ -700,6 +718,13 @@ struct bcm_cfg80211 {
 	u32 assoc_reject_status;
 	u32 roam_count;
 #endif /* DHD_ENABLE_BIGDATA_LOGGING */
+#ifdef WES_SUPPORT
+#ifdef CUSTOMER_SCAN_TIMEOUT_SETTING
+	int custom_scan_channel_time;
+	int custom_scan_home_time;
+	int custom_scan_home_away_time;
+#endif /* CUSTOMER_SCAN_TIMEOUT_SETTING */
+#endif /* WES_SUPPORT */
 	spinlock_t net_list_sync;
 };
 
@@ -737,14 +762,14 @@ wl_alloc_netinfo(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	return err;
 }
 static inline void
-wl_dealloc_netinfo(struct bcm_cfg80211 *cfg, struct net_device *ndev)
+wl_dealloc_netinfo_by_wdev(struct bcm_cfg80211 *cfg, struct wireless_dev *wdev)
 {
 	struct net_info *_net_info, *next;
 	unsigned long int flags;
 
 	spin_lock_irqsave(&cfg->net_list_sync, flags);
 	list_for_each_entry_safe(_net_info, next, &cfg->net_list, list) {
-		if (ndev && (_net_info->ndev == ndev)) {
+		if (wdev && (_net_info->wdev == wdev)) {
 			list_del(&_net_info->list);
 			cfg->iface_cnt--;
 			kfree(_net_info);
@@ -1052,6 +1077,13 @@ wl_get_netinfo_by_netdev(struct bcm_cfg80211 *cfg, struct net_device *ndev)
 #define IS_AKM_SUITE_CCKM(sec) false
 #endif /* BCMCCX */
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
+#define STA_INFO_BIT(info) (1ul << NL80211_STA_ ## info)
+#define strnicmp(str1, str2, len) strncasecmp((str1), (str2), (len))
+#else
+#define STA_INFO_BIT(info) (STATION_ ## info)
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0)) */
+
 extern s32 wl_cfg80211_attach(struct net_device *ndev, void *context);
 extern s32 wl_cfg80211_attach_post(struct net_device *ndev);
 extern void wl_cfg80211_detach(void *para);
@@ -1243,4 +1275,5 @@ do {                                    \
 	}                               \
 } while (0)
 
+int wl_check_dongle_idle(struct wiphy *wiphy);
 #endif /* _wl_cfg80211_h_ */

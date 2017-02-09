@@ -178,6 +178,9 @@ static void initialize_variable(struct ssp_data *data)
 	data->bIsResumed = false;
 	data->lastOffset = 0;
 	initialize_function_pointer(data);
+	data->errorCount = 0;
+    data->pktErrCnt = 0;
+	data->mcuAbnormal = false;
 }
 
 int initialize_mcu(struct ssp_data *data)
@@ -364,8 +367,8 @@ static int ssp_parse_dt(struct device *dev,struct  ssp_data *data)
 dt_exit:
 	if(data->static_matrix != NULL)
     	kfree(data->static_matrix); 
+    return errorno;
 #endif
-	return errorno;
 }
 
 #if defined(CONFIG_MUIC_NOTIFIER)

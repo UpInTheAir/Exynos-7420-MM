@@ -113,6 +113,7 @@ static int isfw_debug_open(struct inode *inode, struct file *file)
 static ssize_t isfw_debug_read(struct file *file, char __user *user_buf,
 	size_t buf_len, loff_t *ppos)
 {
+	int ret = 0;
 	char *debug;
 	size_t debug_cnt, backup_cnt;
 	size_t count1, count2;
@@ -152,7 +153,11 @@ retry:
 
 		buf_count -= count1;
 
-		memcpy(user_buf, debug, count1);
+		ret = copy_to_user(user_buf, debug, count1);
+		if (ret) {
+			err("[DBG] failed copying %d bytes of debug log\n", ret);
+			return ret;
+		}
 		fimc_is_debug.debug_cnt += count1;
 	}
 
@@ -164,7 +169,11 @@ retry:
 
 		buf_count -= count2;
 
-		memcpy(user_buf, debug, count2);
+		ret = copy_to_user(user_buf, debug, count2);
+		if (ret) {
+			err("[DBG] failed copying %d bytes of debug log\n", ret);
+			return ret;
+		}
 		fimc_is_debug.debug_cnt = count2;
 	}
 

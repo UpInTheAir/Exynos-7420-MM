@@ -51,6 +51,8 @@
 #define FMT_WAKE_TIME   (HZ/2)
 #define RAW_WAKE_TIME   (HZ*6)
 
+extern unsigned int lpcharge;
+
 static struct modem_shared *create_modem_shared_data(
 				struct platform_device *pdev)
 {
@@ -555,6 +557,12 @@ static int modem_probe(struct platform_device *pdev)
 	struct io_device **iod;
 	size_t size;
 	struct link_device *ld;
+
+	if (lpcharge) {
+		mif_err("modem probe canceled - lpcharge mode\n");
+		return -EINVAL;
+	}
+
 	mif_err("%s: +++\n", pdev->name);
 
 	if (dev->of_node) {
@@ -737,6 +745,7 @@ static struct platform_driver modem_driver = {
 		.name = "mif_sipc5",
 		.owner = THIS_MODULE,
 		.pm = &modem_pm_ops,
+		.suppress_bind_attrs = true,
 #ifdef CONFIG_OF
 		.of_match_table = of_match_ptr(sec_modem_match),
 #endif

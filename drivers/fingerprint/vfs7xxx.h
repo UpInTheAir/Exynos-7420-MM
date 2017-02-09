@@ -132,6 +132,9 @@
 #define VFSSPI_IOCTL_SET_LOCKSCREEN     _IOW(VFSSPI_IOCTL_MAGIC,	\
 							22, unsigned int)
 #endif
+/* To control the power */
+#define VFSSPI_IOCTL_POWER_CONTROL     _IOW(VFSSPI_IOCTL_MAGIC,	\
+							23, unsigned int)
 /* get sensor orienation from the SPI driver*/
 #define VFSSPI_IOCTL_GET_SENSOR_ORIENT	\
 	_IOR(VFSSPI_IOCTL_MAGIC, 18, unsigned int)
@@ -145,11 +148,29 @@
  * @tx_buffer:pointer to transmitted data
  * @len:transmitted/retrieved data size
  */
+#ifdef CONFIG_SENSORS_FINGERPRINT_32BITS_PLATFORM_ONLY
+/*
+* Platform supports only 32 bits.
+*/
 struct vfsspi_ioctl_transfer {
+	u32 rx_buffer;
+	u32 tx_buffer;
+	u32 len;
+};
+#else
+ struct vfsspi_ioctl_transfer {
 	unsigned char *rx_buffer;
 	unsigned char *tx_buffer;
 	unsigned int len;
 };
+#endif
+
+/* used for WoG mode */
+extern void vfsspi_fp_homekey_ev(void);
+/* export variable for signaling */
+EXPORT_SYMBOL(vfsspi_fp_homekey_ev);
+extern int vfsspi_goto_suspend;
+EXPORT_SYMBOL(vfsspi_goto_suspend);
 #endif
 
 /*

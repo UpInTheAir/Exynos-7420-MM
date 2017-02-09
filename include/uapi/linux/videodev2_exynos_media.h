@@ -490,6 +490,14 @@ enum v4l2_mpeg_video_hevc_hierarchical_coding_type {
 #define V4L2_CID_MPEG_VIDEO_DISABLE_IVF_HEADER			\
 					(V4L2_CID_MPEG_MFC_BASE + 181)
 
+/* CIDs for new common interface */
+#define V4L2_CID_MPEG_VIDEO_TEMPORAL_SHORTTERM_MAX_LAYER	\
+					(V4L2_CID_MPEG_MFC_BASE + 193)
+#define V4L2_CID_MPEG_VIDEO_BLACK_BAR_DETECT			\
+					(V4L2_CID_MPEG_MFC_BASE + 194)
+#define V4L2_CID_MPEG_MFC_H264_NUM_OF_LTR			\
+					(V4L2_CID_MPEG_MFC_BASE + 195)
+
 /* QP BOUND interface */
 #define V4L2_CID_MPEG_VIDEO_H264_MAX_QP_P			\
 					(V4L2_CID_MPEG_MFC_BASE + 201)

@@ -26,7 +26,11 @@
 #elif defined (CONFIG_SENSORS_SSP_ROYCELTE) /* Royce */
 #define SSP_FIRMWARE_REVISION_STM	15070900
 #else /* Zero */
-#define SSP_FIRMWARE_REVISION_STM	16050600
+#if ANDROID_VERSION < 70000			/* M OS*/
+#define SSP_FIRMWARE_REVISION_STM	16101400
+#else								/* N OS*/
+#define SSP_FIRMWARE_REVISION_STM	17012500
+#endif
 #endif
 
 #define SSP_INVALID_REVISION            99999
@@ -44,7 +48,11 @@
 #elif defined (CONFIG_SENSORS_SSP_ROYCELTE)	/* Royce */
 #define BL_FW_NAME			"ssp_stm_royce.fw"
 #else /* Zero */
+#if ANDROID_VERSION < 70000			/* M OS*/
+#define BL_FW_NAME			"ssp_stm_m.fw"
+#else								/* N OS*/
 #define BL_FW_NAME			"ssp_stm.fw"
+#endif
 #endif
 
 #define BL_UMS_FW_NAME			"ssp_stm.bin"

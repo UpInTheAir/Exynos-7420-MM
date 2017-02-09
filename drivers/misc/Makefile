@@ -71,9 +71,8 @@ obj-$(CONFIG_MOBICORE_DRIVER)  += tzic64.o
 # BlowFish
 obj-$(CONFIG_TZDEV)		+= tzdev/
 
-ifeq ($(TIMA_ENABLED),1)
+# Tima
 obj-$(CONFIG_TIMA_LOG)		+= tima_debug_log.o
-endif
 
 # SS/DS
 obj-$(CONFIG_CHECK_SIMSLOT_COUNT) += sim_slot.o

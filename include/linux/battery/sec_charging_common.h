@@ -36,6 +36,8 @@
 
 #ifdef CONFIG_BATTERY_SWELLING_SELF_DISCHARGING
 #include <linux/sec_batt_selfdchg_common.h>
+#else
+#include <linux/uaccess.h>
 #endif
 
 /* definitions */
@@ -68,6 +70,8 @@ enum sec_battery_capacity_mode {
 	SEC_BATTERY_CAPACITY_AGEDCELL,
 	/* charge count */
 	SEC_BATTERY_CAPACITY_CYCLE,
+	/* full capacity rep */
+	SEC_BATTERY_CAPACITY_FULL,
 };
 
 #if defined(CONFIG_WIRELESS_FIRMWARE_UPDATE) || defined(CONFIG_WIRELESS_CHARGER_HIGH_VOLTAGE)
@@ -567,6 +571,7 @@ struct sec_battery_platform_data {
 	int swelling_low_temp_block;
 	int swelling_low_temp_recov;
 	int swelling_chg_current;
+	int swelling_wc_chg_current;
 	unsigned int swelling_normal_float_voltage;
 	unsigned int swelling_drop_float_voltage;
 	unsigned int swelling_high_rechg_voltage;
@@ -658,6 +663,10 @@ struct sec_battery_platform_data {
 	int temp_high_recovery_lpm;
 	int temp_low_threshold_lpm;
 	int temp_low_recovery_lpm;
+	int wpc_high_threshold_normal;
+	int wpc_high_recovery_normal;
+	int wpc_low_threshold_normal;
+	int wpc_low_recovery_normal;
 	int chg_high_temp_1st;
 	int chg_high_temp_2nd;
 	int chg_high_temp_recovery;
@@ -671,8 +680,6 @@ struct sec_battery_platform_data {
 	int wpc_lcd_on_high_temp_rec;
 	unsigned int wpc_charging_limit_current;
 	unsigned int sleep_mode_limit_current;
-	unsigned int wpc_skip_check_time;
-	unsigned int wpc_skip_check_capacity;
 	int mix_high_tbat;
 	int mix_high_tchg;
 	int mix_high_tbat_recov;
@@ -717,6 +724,9 @@ struct sec_battery_platform_data {
 	unsigned long recharging_total_time;
 	/* reset charging for abnormal malfunction (0: not use) */
 	unsigned long charging_reset_time;
+	unsigned int hv_charging_total_time;
+	unsigned int normal_charging_total_time;
+	unsigned int usb_charging_total_time;
 
 	/* fuel gauge */
 	char *fuelgauge_name;
@@ -778,6 +788,12 @@ struct sec_battery_platform_data {
 	int sub_det;
 	bool sub_pba_detection;
 	bool sub_pba_available;
+#endif
+
+#if defined(CONFIG_BATTERY_CISD)
+	unsigned int cisd_cap_high_thr;
+	unsigned int cisd_cap_low_thr;
+	unsigned int cisd_cap_limit;
 #endif
 
 	/* ADC setting */
@@ -939,5 +955,39 @@ static inline struct power_supply *get_power_supply_by_name(char *name)
 	((extended >> ONLINE_TYPE_SUB_SHIFT)&0xf)
 #define GET_POWER_CABLE_TYPE(extended)	\
 	((extended >> ONLINE_TYPE_PWR_SHIFT)&0xf)
+
+#if !defined(CONFIG_BATTERY_SAMSUNG_V2)
+#define is_hv_wireless_type(cable_type) ( \
+	cable_type == POWER_SUPPLY_TYPE_HV_WIRELESS || \
+	cable_type == POWER_SUPPLY_TYPE_HV_WIRELESS_ETX)
+
+#define is_nv_wireless_type(cable_type)	( \
+	cable_type == POWER_SUPPLY_TYPE_WIRELESS || \
+	cable_type == POWER_SUPPLY_TYPE_PMA_WIRELESS)
+
+#define is_wireless_type(cable_type) \
+	(is_hv_wireless_type(cable_type) || is_nv_wireless_type(cable_type))
+
+#define is_not_wireless_type(cable_type) ( \
+	cable_type != POWER_SUPPLY_TYPE_WIRELESS && \
+	cable_type != POWER_SUPPLY_TYPE_PMA_WIRELESS && \
+	cable_type != POWER_SUPPLY_TYPE_HV_WIRELESS && \
+	cable_type != POWER_SUPPLY_TYPE_HV_WIRELESS_ETX)
+
+#define is_wired_type(cable_type) \
+	(is_not_wireless_type(cable_type) && (cable_type != POWER_SUPPLY_TYPE_BATTERY))
+
+#define is_hv_afc_wire_type(cable_type) ( \
+	cable_type == POWER_SUPPLY_TYPE_HV_ERR || \
+	cable_type == POWER_SUPPLY_TYPE_HV_MAINS || \
+	cable_type == POWER_SUPPLY_TYPE_HV_UNKNOWN)
+
+#define is_hv_wire_9v_type(cable_type) ( \
+	cable_type == POWER_SUPPLY_TYPE_HV_ERR || \
+	cable_type == POWER_SUPPLY_TYPE_HV_MAINS || \
+	cable_type == POWER_SUPPLY_TYPE_HV_UNKNOWN) /* ???? */
+
+#define is_hv_wire_type(cable_type) (is_hv_afc_wire_type(cable_type))
+#endif /* !CONFIG_BATTERY_SAMSUNG_V2 */
 
 #endif /* __SEC_CHARGING_COMMON_H */

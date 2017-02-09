@@ -1,7 +1,7 @@
 /*
  * Linux OS Independent Layer
  *
- * Copyright (C) 1999-2015, Broadcom Corporation
+ * Copyright (C) 1999-2016, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: linux_osl.h 547511 2015-04-08 21:22:26Z $
+ * $Id: linux_osl.h 632785 2016-04-20 12:20:03Z $
  */
 
 #ifndef _linux_osl_h_
@@ -170,7 +170,7 @@ extern void osl_dma_free_consistent(osl_t *osh, void *va, uint size, dmaaddr_t p
 	osl_dma_unmap((osh), (pa), (size), (direction))
 extern dmaaddr_t osl_dma_map(osl_t *osh, void *va, uint size, int direction, void *p,
 	hnddma_seg_map_t *txp_dmah);
-extern void osl_dma_unmap(osl_t *osh, uint pa, uint size, int direction);
+extern void osl_dma_unmap(osl_t *osh, dmaaddr_t pa, uint size, int direction);
 
 /* API for DMA addressing capability */
 #define OSL_DMADDRWIDTH(osh, addrwidth) ({BCM_REFERENCE(osh); BCM_REFERENCE(addrwidth);})

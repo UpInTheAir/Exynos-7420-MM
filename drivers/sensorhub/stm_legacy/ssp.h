@@ -522,7 +522,6 @@ struct ssp_data {
 #endif
 	int acc_type;
 	int pressure_type;
-	atomic_t int_gyro_enable;
 	char sensor_state[SENSOR_MAX + 1];
 	int gyro_lib_state;
 };

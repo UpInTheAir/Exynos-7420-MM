@@ -1,3 +1,7 @@
+#ifdef CONFIG_TRUSTONIC_TRUSTED_UI
+#include <linux/t-base-tui.h>
+#endif
+
 #ifdef SEC_TSP_FACTORY_TEST
 
 #define TSP_FACTEST_RESULT_PASS		2
@@ -127,7 +131,7 @@ static ssize_t fts_edge_x_position(struct device *dev,
 				struct device_attribute *attr, char *buf);
 
 #ifdef CONFIG_TRUSTONIC_TRUSTED_UI
-static void tui_mode_cmd(struct fts_ts_info *info);
+extern int tui_force_close(uint32_t arg);
 #endif
 
 #define FT_CMD(name, func)	.cmd_name = name, .cmd_func = func
@@ -363,6 +367,11 @@ static ssize_t store_cmd(struct device *dev, struct device_attribute *devattr,
 		return -EINVAL;
 	}
 
+	if (strlen(buf) >= CMD_STR_LEN) {		
+		printk(KERN_ERR "%s: cmd length is over (%s,%d)!!\n", __func__, buf, (int)strlen(buf));
+		return -EINVAL;
+	}
+
 	if (!info->input_dev) {
 		printk(KERN_ERR "%s: No input_dev data found\n",
 				__func__);
@@ -462,18 +471,13 @@ static ssize_t store_cmd(struct device *dev, struct device_attribute *devattr,
 				param_cnt++;
 			}
 			cur++;
-		} while (cur - buf <= len);
+		} while ((cur - buf <= len) && (param_cnt <  CMD_PARAM_NUM));
 	}
 	tsp_debug_info(true, &info->client->dev, "cmd = %s\n", ft_cmd_ptr->cmd_name);
 	for (i = 0; i < param_cnt; i++)
 		tsp_debug_info(true, &info->client->dev, "cmd param %d= %d\n", i,
 			  info->cmd_param[i]);
 
-#ifdef CONFIG_TRUSTONIC_TRUSTED_UI
-	if (TRUSTEDUI_MODE_INPUT_SECURED & trustedui_get_current_mode())
-		tui_mode_cmd(info);
-	else
-#endif
 	ft_cmd_ptr->cmd_func(info);
 
 err_out:
@@ -576,22 +580,6 @@ static void set_cmd_result(struct fts_ts_info *info, char *buff, int len)
 {
 	strncat(info->cmd_result, buff, len);
 }
-
-#ifdef CONFIG_TRUSTONIC_TRUSTED_UI
-static void tui_mode_cmd(struct fts_ts_info *info)
-{
-	char buff[16] = "TUImode:FAIL";
-	set_default_result(info);
-	set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
-
-	mutex_lock(&info->cmd_lock);
-	info->cmd_is_running = false;
-	mutex_unlock(&info->cmd_lock);
-
-	info->cmd_state = CMD_STATUS_NOT_APPLICABLE;
-	tsp_debug_info(true, &info->client->dev, "%s: %s\n", __func__, buff);
-}
-#endif
 
 static void not_support_cmd(void *device_data)
 {
@@ -2742,6 +2730,17 @@ static void clear_cover_mode(void *device_data)
 		if (info->cmd_param[0] > 1) {
 			info->flip_enable = true;
 			info->cover_type = info->cmd_param[1];
+#ifdef CONFIG_TRUSTONIC_TRUSTED_UI
+			if(TRUSTEDUI_MODE_TUI_SESSION & trustedui_get_current_mode()){
+				fts_delay(100);
+				tui_force_close(1);
+				fts_delay(200);
+				if(TRUSTEDUI_MODE_TUI_SESSION & trustedui_get_current_mode()){
+					trustedui_clear_mask(TRUSTEDUI_MODE_VIDEO_SECURED|TRUSTEDUI_MODE_INPUT_SECURED);
+					trustedui_set_mode(TRUSTEDUI_MODE_OFF);
+				}
+			}
+#endif // CONFIG_TRUSTONIC_TRUSTED_UI
 		} else {
 			info->flip_enable = false;
 		}
@@ -3851,16 +3850,6 @@ static void spay_enable(void *device_data)
 	unsigned short addr = FTS_CMD_STRING_ACCESS;
 	int ret;
 	char buff[CMD_STR_LEN] = { 0 };
-
-	if (info->touch_stopped) {
-		tsp_debug_info(true, &info->client->dev, "%s: [ERROR] Touch is stopped\n", __func__);
-
-		snprintf(buff, sizeof(buff), "%s", "TSP turned off");
-
-		set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
-		info->cmd_state = CMD_STATUS_NOT_APPLICABLE;
-		goto out;
-	}
 
 	set_default_result(info);
 

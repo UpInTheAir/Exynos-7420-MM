@@ -48,6 +48,9 @@
 #define P61_SET_WIRED_ACCESS _IOW(PN547_MAGIC, 0x04, unsigned int)
 #define P547_SET_NFC_SERVICE_PID _IOW(PN547_MAGIC, 0x05, long)
 
+#define P547_GET_ESE_ACCESS _IOW(PN547_MAGIC, 0x06, long)
+#define P547_REL_SVDD_WAIT _IOW(PN547_MAGIC, 0x07, long)
+
 #ifdef CONFIG_NFC_PN547_LDO_CONTROL
 #define NFC_I2C_LDO_ON	1
 #define NFC_I2C_LDO_OFF	0
@@ -62,6 +65,10 @@ typedef enum p61_access_state{
 	P61_STATE_SPI_PRIO = 0x1000, /*Start of p61 access by SPI on priority*/
 	P61_STATE_SPI_PRIO_END = 0x2000, /*End of p61 access by SPI on priority*/
 	P61_STATE_SPI_END = 0x4000,
+	P61_STATE_SPI_SVDD_SYNC_START = 0x0001, /*ESE_VDD Low req by SPI*/
+	P61_STATE_SPI_SVDD_SYNC_END = 0x0002, /*ESE_VDD is Low by SPI*/
+	P61_STATE_DWP_SVDD_SYNC_START = 0x0004, /*ESE_VDD  Low req by Nfc*/
+	P61_STATE_DWP_SVDD_SYNC_END = 0x0008, /*ESE_VDD is Low by Nfc*/
 }p61_access_state_t;
 #endif
 
@@ -70,9 +77,8 @@ struct pn547_i2c_platform_data {
 	int irq_gpio;
 	int ven_gpio;
 	int firm_gpio;
-#if 1 //ese
 	int ese_pwr_req;
-#endif
+
 #ifdef CONFIG_NFC_PN547_CLOCK_REQUEST
 	int clk_req_gpio;
 	int clk_req_irq;
@@ -92,13 +98,12 @@ struct pn547_i2c_platform_data {
 	u32 scl_gpio_flags;
 	u32 sda_gpio_flags;
 #endif
-	u32 ese_pwr_req_flags; ///
+	u32 ese_pwr_req_flags; 
 #endif
 #ifdef CONFIG_NFC_PN547_LDO_CONTROL
 	const char *i2c_1p8;
 #endif
 };
 
-#ifdef CONFIG_NFC_PN547_LDO_CONTROL
 extern unsigned int lpcharge;
-#endif
+

@@ -1830,7 +1830,7 @@ static void bcm4773_spi_shutdown(struct spi_device *spi)
 	printk("[SSPBBD]: %s ** \n", __func__);
 
 	flush_workqueue(bport->serial_wq );
-	destroy_workqueue( bport->serial_wq );
+	//destroy_workqueue( bport->serial_wq );
 
 	printk("[SSPBBD]: %s -- \n", __func__);
 }
@@ -1864,6 +1864,7 @@ static struct spi_driver	bcm4773_spi_driver=
 	{
 		.name		= "ssp",
 		.owner		= THIS_MODULE,
+		.suppress_bind_attrs		= true,
 #ifdef CONFIG_OF
 		.of_match_table = ssp_match_table
 #endif

@@ -73,6 +73,7 @@
 
 extern struct muic_platform_data muic_pdata;
 static bool debug_en_vps = false;
+struct max77843_muic_data *gmuic_data;
 
 struct max77843_muic_vps_data {
 	u8				adc1k;
@@ -1234,15 +1235,15 @@ static ssize_t max77843_muic_set_afc_disable(struct device *dev,
 	int ret;
 
 	if (!strncasecmp(buf, "1", 1)) {
-		ret = set_param(CM_OFFSET + 1, '1');
+		ret = sec_set_param(CM_OFFSET + 1, '1');
 		if (ret < 0)
-			pr_err("%s:set_param failed\n", __func__);
+			pr_err("%s:sec_set_param failed\n", __func__);
 		else
 			pdata->afc_disable = true;
 	} else if (!strncasecmp(buf, "0", 1)) {
-		ret = set_param(CM_OFFSET + 1, '0');
+		ret = sec_set_param(CM_OFFSET + 1, '0');
 		if (ret < 0)
-			pr_err("%s:set_param failed\n", __func__);
+			pr_err("%s:sec_set_param failed\n", __func__);
 		else
 			pdata->afc_disable = false;
 	} else {
@@ -1255,7 +1256,6 @@ static ssize_t max77843_muic_set_afc_disable(struct device *dev,
 }
 #endif /* CONFIG_HV_MUIC_MAX77843_AFC */
 
-#ifdef CONFIG_MUIC_HV_FORCE_LIMIT
 static ssize_t max77843_muic_show_hv(struct device *dev,
 					   struct device_attribute *attr,
 					   char *buf)
@@ -1316,22 +1316,11 @@ static void max77843_muic_adcmode_switch_vbus
 		pr_err("%s:%s cannot switch adcmode(%d)\n", MUIC_HV_DEV_NAME, __func__, ret);
 }
 
-static ssize_t max77843_muic_set_hv(struct device *dev,
-					  struct device_attribute *attr,
-					  const char *buf, size_t count)
+int hv_muic_change_afc_voltage(struct max77843_muic_data *muic_data, int vol)
 {
-	struct max77843_muic_data *muic_data = dev_get_drvdata(dev);
 	unsigned int repeat_cnt;
 
-	if (!strncasecmp(buf, "5V", 2)) {
-
-		if(muic_data->pdata->hv_sel == 1) {
-			pr_info("%s:%s off 9V called twice [%d]\n",	MUIC_DEV_NAME, __func__, muic_data->pdata->hv_sel);
-			return count;
-		}
-
-		muic_data->pdata->hv_sel = 1;
-
+	if(vol == 5) {
 		switch (muic_data->attached_dev) {
 		case ATTACHED_DEV_AFC_CHARGER_9V_MUIC:
 			pr_info("%s:%s reset muic to change AFC 9V => TA 5V case 1 attached_dev[%d]\n", MUIC_DEV_NAME, __func__, muic_data->attached_dev);
@@ -1368,22 +1357,13 @@ static ssize_t max77843_muic_set_hv(struct device *dev,
 			pr_info("%s:%s reset called case 1 but charger is not connected attached_dev[%d]\n",	MUIC_DEV_NAME, __func__, muic_data->attached_dev);
 			break;
 		}
-
-	}	else if(!strncasecmp(buf, "9V", 2)){
-
-		if(muic_data->pdata->hv_sel == 0) {
-			pr_info("%s:%s off 5V called twice [%d]\n",	MUIC_DEV_NAME, __func__, muic_data->pdata->hv_sel);
-			return count;
-		}
-
-		muic_data->pdata->hv_sel = 0;
-
+	} else {
 		switch (muic_data->attached_dev) {
 		case ATTACHED_DEV_AFC_CHARGER_5V_MUIC:
+		case ATTACHED_DEV_AFC_CHARGER_5V_DUPLI_MUIC:
 			pr_info("%s:%s reset muic to change AFC 5V => TA 9V case 2 attached_dev[%d]\n",	MUIC_DEV_NAME, __func__, muic_data->attached_dev);
 
 			muic_data->afc_count = 0;
-			muic_data->pdata->silent_chg_change_state = SILENT_CHG_CHANGING;
 
 			max77843_muic_adcmode_switch_vbus(muic_data, true);
 			max77843_write_reg(muic_data->i2c, MAX77843_MUIC_REG_HVTXBYTE, 0x46);
@@ -1394,14 +1374,12 @@ static ssize_t max77843_muic_set_hv(struct device *dev,
 				msleep(10);
 //				pr_info("%s:%s wait until attached device changing attached_dev[%d]\n", MUIC_DEV_NAME, __func__, muic_data->attached_dev);
 			}
-			muic_data->pdata->silent_chg_change_state = SILENT_CHG_DONE;
 			pr_info("%s:%s change done attached_dev[%d] waited[%d]ms \n", MUIC_DEV_NAME, __func__, muic_data->attached_dev, (30-repeat_cnt)*10);
 
 			break;
 		case ATTACHED_DEV_QC_CHARGER_5V_MUIC:
 			pr_info("%s:%s reset muic to change QC 5V => TA 9V case 2 attached_dev[%d]\n", MUIC_DEV_NAME, __func__, muic_data->attached_dev);
 
-			muic_data->pdata->silent_chg_change_state = SILENT_CHG_CHANGING;
 			max77843_muic_adcmode_switch_vbus(muic_data, true);
 			muic_data->is_qc_vb_settle = false;
 			max77843_write_reg(muic_data->i2c, MAX77843_MUIC_REG_HVCONTROL1, 0x3D);
@@ -1411,8 +1389,6 @@ static ssize_t max77843_muic_set_hv(struct device *dev,
 				msleep(10);
 //				pr_info("%s:%s wait until attached device changing attached_dev[%d]\n",	MUIC_DEV_NAME, __func__, muic_data->attached_dev);
 			}
-			muic_data->pdata->silent_chg_change_state = SILENT_CHG_DONE;
-
 			pr_info("%s:%s change done attached_dev[%d] waited[%d]ms \n", MUIC_DEV_NAME, __func__, muic_data->attached_dev, (30-repeat_cnt)*10);
 
 			break;
@@ -1420,14 +1396,43 @@ static ssize_t max77843_muic_set_hv(struct device *dev,
 			pr_info("%s:%s reset called case 2 but charger is not connected attached_dev[%d]\n",	MUIC_DEV_NAME, __func__, muic_data->attached_dev);
 			break;
 		}
+	}
 
-	}else{
+	return 0;
+}
+
+static ssize_t max77843_muic_set_hv(struct device *dev, struct device_attribute *attr,
+					  const char *buf, size_t count)
+{
+	if (!strncasecmp(buf, "5V", 2)) {
+		pr_info("%s:%s 5V\n",	MUIC_DEV_NAME, __func__);
+	} else if (!strncasecmp(buf, "9V", 2)){
+		pr_info("%s:%s 9V\n",	MUIC_DEV_NAME, __func__);
+	} else {
 		pr_warn("%s:%s invalid value\n", MUIC_DEV_NAME, __func__);
 	}
 
 	return count;
 }
-#endif
+
+int muic_afc_set_voltage(int vol)
+{
+	if (!gmuic_data) {
+		pr_err("%s:%s cannot read pmuic!\n", MUIC_HV_DEV_NAME, __func__);
+		return 0;
+	}
+
+	if (vol == 5) {
+		hv_muic_change_afc_voltage(gmuic_data, 5);			
+	} else if (vol == 9) {
+		hv_muic_change_afc_voltage(gmuic_data, 9);
+	} else {
+		pr_warn("%s:%s invalid value\n", MUIC_DEV_NAME, __func__);
+		return 0;
+	}
+
+	return 1;
+}
 
 #if defined(CONFIG_MUIC_DET_JACK)
 static ssize_t key_state_onoff_show(struct device *dev,	struct device_attribute *attr, char *buf)
@@ -1479,10 +1484,8 @@ static DEVICE_ATTR(afc_disable, 0664,
 		max77843_muic_show_afc_disable, max77843_muic_set_afc_disable);
 #endif /* CONFIG_HV_MUIC_MAX77843_AFC */
 
-#ifdef CONFIG_MUIC_HV_FORCE_LIMIT
 static DEVICE_ATTR(hv_sel, 0664, max77843_muic_show_hv,
 		max77843_muic_set_hv);
-#endif
 
 #if defined(CONFIG_MUIC_DET_JACK)
 static DEVICE_ATTR(key_state, 0444,
@@ -1509,9 +1512,7 @@ static struct attribute *max77843_muic_attributes[] = {
 #if defined(CONFIG_HV_MUIC_MAX77843_AFC)
 	&dev_attr_afc_disable.attr,
 #endif /* CONFIG_HV_MUIC_MAX77843_AFC */
-#ifdef CONFIG_MUIC_HV_FORCE_LIMIT
 	&dev_attr_hv_sel.attr,
-#endif
 	NULL
 };
 
@@ -3188,6 +3189,8 @@ static int max77843_muic_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err_return;
 	}
+
+	gmuic_data = muic_data;
 
 #if defined(CONFIG_MUIC_DET_JACK)
 	input = input_allocate_device();

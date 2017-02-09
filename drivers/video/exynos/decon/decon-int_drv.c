@@ -38,6 +38,22 @@
 static int underrun_filter_status;
 static struct delayed_work underrun_filter_work;
 
+static void decon_dump(struct decon_device *decon)
+{
+	dev_err(decon->dev, "=== DECON%d SFR DUMP ===\n", decon->id);
+
+	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4,
+			decon->regs, 0x718, false);
+	dev_err(decon->dev, "=== DECON%d MIC SFR DUMP ===\n", decon->id);
+
+	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4,
+			decon->regs + 0x2400, 0x20, false);
+	dev_err(decon->dev, "=== DECON%d SHADOW SFR DUMP ===\n", decon->id);
+
+	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 32, 4,
+			decon->regs + SHADOW_OFFSET, 0x718, false);
+}
+
 static void underrun_filter_handler(struct work_struct *ws)
 {
        msleep(UNDERRUN_FILTER_INTERVAL_MS);
@@ -63,6 +79,10 @@ static void decon_oneshot_underrun_log(struct decon_device *decon)
 				decon->underrun_stat.used_windows,
 				decon->underrun_stat.aclk / MHZ,
 				decon->underrun_stat.lh_disp0 / MHZ);
+		decon_reg_set_int_fifo(decon->id, 0);
+		decon->int_fifo_status = false;
+		decon_dump(decon);
+		vpp_dump(decon);
 	}
 	decon->underrun_stat.underrun_cnt = 0;
 
@@ -260,14 +280,28 @@ void decon_int_set_clocks(struct decon_device *decon)
 	switch (lcd_in_pixels) {
 	case (2560 * 1600):
 		/* NOTE: DPLL, ACLK_DISP_400 & PCLK_DISP must be set by boot loader */
-		decon_clk_set_rate(dev, "disp_pll", 134 * MHZ);
-		decon_clk_set_parent(dev, "m_sclk_decon0_eclk", "mout_bus1_pll_top0");
-		decon_clk_set_rate(dev, "dout_sclk_decon_int_eclk", 168 * MHZ);
-		decon_clk_set_parent(dev, "m_decon0_eclk", "um_decon0_eclk");
-		decon_clk_set_rate(dev, "d_decon0_eclk", 168 * MHZ);
-		decon_clk_set_parent(dev, "m_decon0_vclk", "disp_pll");
-		decon_clk_set_rate(dev, "d_decon0_vclk", 134 * MHZ);
+		clk_set_rate(decon->res.disp_pll, 134 * MHZ);
+		clk_set_parent(decon->res.m_sclk_decon_eclk,
+				decon->res.mout_bus1_pll_top0);
+		clk_set_rate(decon->res.dout_sclk_decon_eclk, 168 * MHZ);
+		clk_set_parent(decon->res.m_decon_eclk, decon->res.um_decon_eclk);
+		clk_set_rate(decon->res.d_decon_eclk, 168 * MHZ);
+		clk_set_parent(decon->res.m_decon_vclk, decon->res.disp_pll);
+		clk_set_rate(decon->res.d_decon_vclk, 134 * MHZ);
 		break;
+#ifdef CONFIG_FB_DSU
+	default: // case (2560 * 1440):
+		/* NOTE: DPLL, ACLK_DISP_400 & PCLK_DISP must be set by boot loader */
+		clk_set_rate(decon->res.disp_pll, 127 * MHZ);
+		clk_set_parent(decon->res.m_sclk_decon_eclk,
+				decon->res.mout_bus1_pll_top0);
+		clk_set_rate(decon->res.dout_sclk_decon_eclk, 168 * MHZ);
+		clk_set_parent(decon->res.m_decon_eclk, decon->res.um_decon_eclk);
+		clk_set_rate(decon->res.d_decon_eclk, 168 * MHZ);
+		clk_set_parent(decon->res.m_decon_vclk, decon->res.disp_pll);
+		clk_set_rate(decon->res.d_decon_vclk, 127 * MHZ);
+		break;
+#else
 	case (2560 * 1440):
 		/* NOTE: DPLL, ACLK_DISP_400 & PCLK_DISP must be set by boot loader */
 		clk_set_rate(decon->res.disp_pll, 127 * MHZ);
@@ -279,8 +313,10 @@ void decon_int_set_clocks(struct decon_device *decon)
 		clk_set_parent(decon->res.m_decon_vclk, decon->res.disp_pll);
 		clk_set_rate(decon->res.d_decon_vclk, 127 * MHZ);
 		break;
+
 	case (1920 * 1080):
 		/* NOTE: DPLL, ACLK_DISP_400 & PCLK_DISP must be set by boot loader */
+#ifdef CONFIG_EXYNOS_DECON_DUAL_DSI
 		decon_clk_set_rate(dev, "disp_pll", 267 * MHZ);
 		decon_clk_set_parent(dev, "m_sclk_decon0_eclk", "mout_bus1_pll_top0");
 		decon_clk_set_rate(dev, "dout_sclk_decon_int_eclk", 100 * MHZ);
@@ -293,6 +329,15 @@ void decon_int_set_clocks(struct decon_device *decon)
 		} else {
 			decon_clk_set_rate(dev, "d_decon0_vclk", 72 * MHZ);
 		}
+#else
+		decon_clk_set_rate(dev, "disp_pll", 142 * MHZ);
+		decon_clk_set_parent(dev, "m_sclk_decon0_eclk", "mout_bus1_pll_top0");
+		decon_clk_set_rate(dev, "dout_sclk_decon_int_eclk", 100 * MHZ);
+		decon_clk_set_parent(dev, "m_decon0_eclk", "um_decon0_eclk");
+		decon_clk_set_rate(dev, "d_decon0_eclk", 100 * MHZ);
+		decon_clk_set_parent(dev, "m_decon0_vclk", "disp_pll");
+		decon_clk_set_rate(dev, "d_decon0_vclk", 142 * MHZ);
+#endif
 		break;
 	default:
 		/* NOTE: DPLL, ACLK_DISP_400 & PCLK_DISP must be set by boot loader */
@@ -306,6 +351,7 @@ void decon_int_set_clocks(struct decon_device *decon)
 		decon_clk_set_rate(dev, "d_decon0_vclk", 134 * MHZ);
 		decon_info("%s:%d\n", __func__, __LINE__);
 		break;
+#endif
 	}
 	decon_dbg("%s:disp_pll %ld d_decon0_eclk %ld d_decon0_vclk %ld dout_aclk_disp_400 %ld d_pclk_disp %ld\n",
 		__func__, decon_clk_get_rate(dev, "disp_pll"), decon_clk_get_rate(dev, "d_decon0_eclk"),
@@ -1032,7 +1078,7 @@ u32 decon_reg_get_cam_status(void __iomem *cam_status)
 	else
 		return 0xF;
 }
-
+#ifdef CONFIG_DECON_LPD_DISPLAY
 bool static decon_has_drm(struct decon_device *decon)
 {
 	if (decon->prev_protection_bitmask ||
@@ -1047,7 +1093,7 @@ bool static decon_has_drm(struct decon_device *decon)
 
 	return false;
 }
-
+#endif
 static int decon_enter_lpd(struct decon_device *decon)
 {
 	int ret = 0;

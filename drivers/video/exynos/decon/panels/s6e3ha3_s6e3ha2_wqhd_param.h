@@ -33,19 +33,18 @@ struct lcd_seq_info
 #define POWER_IS_ON(pwr)			(pwr <= FB_BLANK_NORMAL)
 
 #define AUTOBRIGHTNESS_LEVEL		12
-#define LEVEL_IS_HBM(level)			(level >= AUTOBRIGHTNESS_LEVEL)
-#define LEVEL_IS_HBM_AREA(level)	((level >= 6) && (level < AUTOBRIGHTNESS_LEVEL))
+#define LEVEL_IS_HBM(brightness)	(brightness == EXTEND_BRIGHTNESS)
 
 #define UNDER_MINUS_20(temperature)	(temperature <= -20)
 #define UNDER_0(temperature)	(temperature <= 0)
 
-#define ACL_IS_ON(nit) 				(nit < 420)
 #define CAPS_IS_ON(level)	(level >= 41)
 
 #define NORMAL_TEMPERATURE			25      /* 25 degrees Celsius */
+#define EXTEND_BRIGHTNESS 			365
 #define UI_MAX_BRIGHTNESS 			255
 #define UI_MIN_BRIGHTNESS 			0
-#define UI_DEFAULT_BRIGHTNESS 		134
+#define UI_DEFAULT_BRIGHTNESS 		128
 
 #ifdef CONFIG_LCD_HMT
 #define DEFAULT_HMT_BRIGHTNESS			162
@@ -60,14 +59,14 @@ enum
         HBM_STATUS_MAX,
 };
 
-enum 
+enum
 {
 	ACL_STATUS_OFF,
 	ACL_STATUS_ON,
 	ACL_STATUS_MAX
 };
 
-enum 
+enum
 {
 	ACL_OPR_OFF,
 	ACL_OPR_8P,
@@ -236,7 +235,6 @@ static const unsigned char SEQ_HBM_ON[] = {
 #define S6E3HA2_HBM_BRIGHTNESS	600
 
 #define S6E3HA2_HBM_ELVSS_INDEX		21
-#define S6E3HA2_HBM_ELVSS_COMP		0x06
 
 #define S6E3HA2_ELVSS_CMD_CNT				3
 #define S6E3HA2_ELVSS_REG					0xB6
@@ -251,7 +249,6 @@ static const unsigned char SEQ_HBM_ON[] = {
 
 #define S6E3HA2_VINT_REG2					0x8B
 
-#define S6E3HA2_HBM_INDEX					73
 
 static const unsigned char S6E3HA2_SEQ_SINGLE_DSI_1[] = {
         0xF2,
@@ -398,6 +395,43 @@ static const unsigned char S6E3HA2_SEQ_TSET[] = {
         0x19                    /* Global para(8th) + 25 degrees  : 0x19 */
 };
 
+#if defined(CONFIG_FB_DSU)
+static const unsigned char S6E3HA2_SEQ_DDI_SCALER_WQHD_00[] = {
+	0xBA,
+	0x01
+};
+
+static const unsigned char S6E3HA2_SEQ_DDI_SCALER_FHD_00[] = {
+	0xBA,
+	0x00
+};
+
+static const unsigned char S6E3HA2_SEQ_DDI_SCALER_FHD_01[] = {
+	0x2A,
+	0x00, 0x00, 0x04, 0x37,
+};
+
+static const unsigned char S6E3HA2_SEQ_DDI_SCALER_FHD_02[] = {
+	0x2B,
+	0x00, 0x00, 0x07, 0x7F,
+};
+
+static const unsigned char S6E3HA2_SEQ_DDI_SCALER_HD_00[] = {
+	0xBA,
+	0x01
+};
+
+static const unsigned char S6E3HA2_SEQ_DDI_SCALER_HD_01[] = { /* HA2 not support HD */
+	0x2A,
+	0x00, 0x00, 0x02, 0xCF,
+};
+
+static const unsigned char S6E3HA2_SEQ_DDI_SCALER_HD_02[] = {
+	0x2B,
+	0x00, 0x00, 0x04, 0xFF,
+};
+#endif
+
 #ifdef CONFIG_LCD_HMT
 #if defined(CONFIG_PANEL_S6E3HF3_DYNAMIC)
 
@@ -525,7 +559,6 @@ static const unsigned char SEQ_HMT_AID_REVERSE1[] = {   /* G.Param */
 #define S6E3HA3_HBM_BRIGHTNESS	600
 
 #define S6E3HA3_HBM_ELVSS_INDEX		21
-#define S6E3HA3_HBM_ELVSS_COMP		0x06
 
 #define S6E3HA3_REG_MIC_ADDR 	0xF9
 #define S6E3HA3_REG_MIC_LEN		1
@@ -698,6 +731,44 @@ static const unsigned char S6E3HA3_SEQ_TE_RISING_TIMING[] = {
 	0x01, 0x09, 0xFF, 0x00, 0x0A
 };
 
+#if defined(CONFIG_FB_DSU)
+static const unsigned char S6E3HA3_SEQ_DDI_SCALER_FHD_00[] = {
+        0xBA,
+        0x02
+};
+
+static const unsigned char S6E3HA3_SEQ_DDI_SCALER_FHD_01[] = {
+        0x2A,
+        0x00, 0x00, 0x04, 0x37
+};
+
+static const unsigned char S6E3HA3_SEQ_DDI_SCALER_FHD_02[] = {
+        0x2B,
+        0x00, 0x00, 0x07, 0x7F
+};
+
+static const unsigned char S6E3HA3_SEQ_DDI_SCALER_HD_00[] = {
+        0xBA,
+        0x00
+};
+
+static const unsigned char S6E3HA3_SEQ_DDI_SCALER_HD_01[] = {
+        0x2A,
+	0x00, 0x00, 0x02, 0xCF,
+};
+
+static const unsigned char S6E3HA3_SEQ_DDI_SCALER_HD_02[] = {
+        0x2B,
+	0x00, 0x00, 0x04, 0xFF,
+};
+
+static const unsigned char S6E3HA3_SEQ_DDI_SCALER_WQHD_00[] = {
+        0xBA,
+        0x01
+};
+#endif
+
+
 #ifdef CONFIG_PANEL_S6E3HF3_DYNAMIC			// only edge panel
 #if defined(CONFIG_SEC_FACTORY) && defined(CONFIG_EXYNOS_DECON_LCD_MCD)
 static const unsigned char SEQ_MCD_ON_SET1[] = {
@@ -803,7 +874,6 @@ static const unsigned char SEQ_MCD_OFF_SET4[] = {
 #define S6E3HF3_HBM_BRIGHTNESS	600
 
 #define S6E3HF3_HBM_ELVSS_INDEX		21
-#define S6E3HF3_HBM_ELVSS_COMP		0x06
 
 /*
 static const unsigned char S6E3HF3_VINT_TABLE[] = {
@@ -942,6 +1012,43 @@ static const unsigned char S6E3HF3_SEQ_PENTILE_SETTING[] = {
 	0x08, 0x0E, 0x07, 0x0B, 0x05, 0x0D, 0x0A, 0x15,
 	0x13, 0x20, 0x1E
 };
+
+#if defined(CONFIG_FB_DSU)
+static const unsigned char S6E3HF3_SEQ_DDI_SCALER_FHD_00[] = {
+        0xBA,
+        0x02
+};
+
+static const unsigned char S6E3HF3_SEQ_DDI_SCALER_FHD_01[] = {
+        0x2A,
+        0x00, 0x3C, 0x04, 0x73
+};
+
+static const unsigned char S6E3HF3_SEQ_DDI_SCALER_FHD_02[] = {
+        0x2B,
+        0x00, 0x00, 0x07, 0x7F
+};
+
+static const unsigned char S6E3HF3_SEQ_DDI_SCALER_HD_00[] = {
+        0xBA,
+        0x00
+};
+
+static const unsigned char S6E3HF3_SEQ_DDI_SCALER_HD_01[] = {
+	0x2A,
+	0x00, 0x28, 0x02, 0xF7,
+};
+
+static const unsigned char S6E3HF3_SEQ_DDI_SCALER_HD_02[] = {
+	0x2B,
+	0x00, 0x00, 0x04, 0xFF,
+};
+
+static const unsigned char S6E3HF3_SEQ_DDI_SCALER_WQHD_00[] = {
+        0xBA,
+        0x01
+};
+#endif
 
 static const unsigned char S6E3HF3_SEQ_PCD[] = {
         0xCC,

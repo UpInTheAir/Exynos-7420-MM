@@ -2,7 +2,7 @@
  * Broadcom Dongle Host Driver (DHD)
  * Prefered Network Offload and Wi-Fi Location Service(WLS) code.
  *
- * Copyright (C) 1999-2015, Broadcom Corporation
+ * Copyright (C) 1999-2016, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -603,7 +603,7 @@ _dhd_pno_get_channels(dhd_pub_t *dhd, uint16 *d_chan_list,
 {
 	int err = BCME_OK;
 	int i, j;
-	uint32 chan_buf[WL_NUMCHANNELS + 1];
+	uint32 chan_buf[WL_NUMCHANNELS];
 	wl_uint32_list_t *list;
 	NULL_CHECK(dhd, "dhd is NULL", err);
 	if (*nchan) {

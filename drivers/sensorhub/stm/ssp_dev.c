@@ -89,6 +89,8 @@ static void initialize_variable(struct ssp_data *data)
 		data->adDelayBuf[iSensorIndex] = DEFUALT_POLLING_DELAY;
 		data->aiCheckStatus[iSensorIndex] = INITIALIZATION_STATE;
 		data->bIsFirstData[iSensorIndex] = false;
+		data->LastSensorTimeforReset[iSensorIndex] = 0;
+		data->IsBypassMode[iSensorIndex] = 0;
 	}
 
 	data->uSensorState = NORMAL_SENSOR_STATE_K;

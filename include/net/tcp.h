@@ -1211,6 +1211,8 @@ extern void tcp_set_state(struct sock *sk, int state);
 
 extern void tcp_done(struct sock *sk);
 
+int tcp_abort(struct sock *sk, int err);
+
 static inline void tcp_sack_reset(struct tcp_options_received *rx_opt)
 {
 	rx_opt->dsack = 0;
@@ -1730,7 +1732,6 @@ enum tcp_seq_states {
 	TCP_SEQ_STATE_LISTENING,
 	TCP_SEQ_STATE_OPENREQ,
 	TCP_SEQ_STATE_ESTABLISHED,
-	TCP_SEQ_STATE_TIME_WAIT,
 };
 
 int tcp_seq_open(struct inode *inode, struct file *file);

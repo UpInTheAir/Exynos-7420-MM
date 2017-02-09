@@ -166,7 +166,7 @@ typedef __u64 __bitwise __addrpair;
  */
 struct sock_common {
 	/* skc_daddr and skc_rcv_saddr must be grouped on a 8 bytes aligned
-	 * address on 64bit arches : cf INET_MATCH() and INET_TW_MATCH()
+	 * address on 64bit arches : cf INET_MATCH()
 	 */
 	union {
 		__addrpair	skc_addrpair;
@@ -202,11 +202,9 @@ struct sock_common {
 	struct net	 	*skc_net;
 #endif
 
-#ifdef CONFIG_MPTCP
 #if IS_ENABLED(CONFIG_IPV6)
 	struct in6_addr		skc_v6_daddr;
 	struct in6_addr		skc_v6_rcv_saddr;
-#endif
 #endif
 
 	/*
@@ -315,6 +313,12 @@ struct sock {
 #define sk_dontcopy_begin	__sk_common.skc_dontcopy_begin
 #define sk_dontcopy_end		__sk_common.skc_dontcopy_end
 #define sk_hash			__sk_common.skc_hash
+#define sk_portpair		__sk_common.skc_portpair
+#define sk_num			__sk_common.skc_num
+#define sk_dport		__sk_common.skc_dport
+#define sk_addrpair		__sk_common.skc_addrpair
+#define sk_daddr		__sk_common.skc_daddr
+#define sk_rcv_saddr		__sk_common.skc_rcv_saddr
 #define sk_family		__sk_common.skc_family
 #define sk_state		__sk_common.skc_state
 #define sk_reuse		__sk_common.skc_reuse
@@ -323,10 +327,8 @@ struct sock {
 #define sk_bind_node		__sk_common.skc_bind_node
 #define sk_prot			__sk_common.skc_prot
 #define sk_net			__sk_common.skc_net
-#ifdef CONFIG_MPTCP
 #define sk_v6_daddr		__sk_common.skc_v6_daddr
 #define sk_v6_rcv_saddr	__sk_common.skc_v6_rcv_saddr
-#endif
 
 	socket_lock_t		sk_lock;
 	struct sk_buff_head	sk_receive_queue;
@@ -1043,6 +1045,7 @@ struct proto {
 	void			(*destroy_cgroup)(struct mem_cgroup *memcg);
 	struct cg_proto		*(*proto_cgroup)(struct mem_cgroup *memcg);
 #endif
+	int			(*diag_destroy)(struct sock *sk, int err);
 };
 
 /*
@@ -1699,6 +1702,10 @@ static inline void sock_put(struct sock *sk)
 	if (atomic_dec_and_test(&sk->sk_refcnt))
 		sk_free(sk);
 }
+/* Generic version of sock_put(), dealing with all sockets
+ * (TCP_TIMEWAIT, ESTABLISHED...)
+ */
+void sock_gen_put(struct sock *sk);
 
 extern int sk_receive_skb(struct sock *sk, struct sk_buff *skb,
 			  const int nested);

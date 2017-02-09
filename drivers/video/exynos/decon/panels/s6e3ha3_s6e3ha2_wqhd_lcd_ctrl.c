@@ -35,6 +35,10 @@ unsigned char TSET_REG;
 unsigned char TSET_MINUS_OFFSET;
 unsigned char VINT_REG2;
 
+#if defined(CONFIG_LCD_RES) && defined(CONFIG_FB_DSU)
+#error cannot use both of CONFIG_LCD_RES and CONFIG_FB_DSU
+#endif
+
 #ifdef CONFIG_ALWAYS_RELOAD_MTP_FACTORY_BUILD
 void update_mdnie_coordinate( u16 coordinate0, u16 coordinate1 );
 static int lcd_reload_mtp(int lcd_type, struct dsim_device *dsim);
@@ -47,7 +51,7 @@ static const unsigned char *ACL_OPR_TABLE_HA2[ACL_OPR_MAX] = { S6E3HA2_SEQ_ACL_O
 static const unsigned char *ACL_OPR_TABLE_HA3[ACL_OPR_MAX] = { S6E3HA3_SEQ_ACL_OFF_OPR, S6E3HA3_SEQ_ACL_ON_OPR_8, S6E3HA3_SEQ_ACL_ON_OPR_15 };
 static const unsigned char *ACL_OPR_TABLE_HF3[ACL_OPR_MAX] = { S6E3HF3_SEQ_ACL_OFF_OPR, S6E3HF3_SEQ_ACL_ON_OPR_8, S6E3HF3_SEQ_ACL_ON_OPR_15 };
 
-static const unsigned int br_tbl[256] = {
+static const unsigned int br_tbl[EXTEND_BRIGHTNESS + 1] = {
 	2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,   // 16
 	16, 17, 18, 19, 20, 21, 22, 23, 25, 27, 29, 31, 33, 36, // 14
 	39, 41, 41, 44, 44, 47, 47, 50, 50, 53, 53, 56, 56, 56, // 14
@@ -69,9 +73,17 @@ static const unsigned int br_tbl[256] = {
 	282, 282, 282, 300, 300, 300, 300, 300, 300, 300, 300,
 	300, 300, 300, 300, 316, 316, 316, 316, 316, 316, 316,
 	316, 316, 316, 316, 316, 333, 333, 333, 333, 333, 333,
-	333, 333, 333, 333, 333, 333, 360       //7
+	333, 333, 333, 333, 333, 333, 360,       //7
+	[256 ... 281] = 420,
+	[282 ... 295] = 465,
+	[296 ... 309] = 488,
+	[310 ... 323] = 510,
+	[324 ... 336] = 533,
+	[337 ... 350] = 555,
+	[351 ... 364] = 578,
+	[365 ... 365] = 600
 };
-static const unsigned int br_tbl_420[256] = {
+static const unsigned int br_tbl_420[EXTEND_BRIGHTNESS + 1] = {
 	2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
 	16, 17, 19, 20, 21, 22, 24, 25, 25, 27, 29, 30, 32, 34, 37, 39,
 	41, 44, 47, 47, 50, 50, 53, 56, 56, 60, 60, 64, 64, 68, 68, 68,
@@ -88,10 +100,17 @@ static const unsigned int br_tbl_420[256] = {
 	316, 316, 316, 316, 316, 316, 333, 333, 333, 333, 350, 350, 350, 350, 350, 350,
 	350, 350, 350, 357, 357, 357, 357, 357, 372, 372, 372, 372, 372, 372, 380, 380,
 	380, 380, 387, 387, 387, 395, 395, 395, 395, 395, 403, 403, 403, 412, 412, 420,
-
+	[256 ... 281] = 420,
+	[282 ... 295] = 465,
+	[296 ... 309] = 488,
+	[310 ... 323] = 510,
+	[324 ... 336] = 533,
+	[337 ... 350] = 555,
+	[351 ... 364] = 578,
+	[365 ... 365] = 600
 };
 
-static unsigned int nb_br_tbl_420[256] = {
+static unsigned int nb_br_tbl_420[EXTEND_BRIGHTNESS + 1] = {
         2,        3,        4,        4,        5,        6,        7,        8,        9,        10,        11,        12,
         13,        14,        15,        16,        17,        19,        19,        20,        21,        22,        24,
         25,        27,        27,        29,        30,        32,        32,        34,        34,        37,        37,
@@ -117,9 +136,17 @@ static unsigned int nb_br_tbl_420[256] = {
         372,        372,        372,        380,        380,        380,        380,        387,        387,        387,
         387,        395,        395,        395,        395,        403,        403,        403,        403,        412,
         412,        412,        412,        420,        420,        420,        420,        420,
+	[256 ... 281] = 420,
+	[282 ... 295] = 465,
+	[296 ... 309] = 488,
+	[310 ... 323] = 510,
+	[324 ... 336] = 533,
+	[337 ... 350] = 555,
+	[351 ... 364] = 578,
+	[365 ... 365] = 600
 };
 
-static unsigned int zen_br_tbl_420[256] ={
+static unsigned int zen_br_tbl_420[EXTEND_BRIGHTNESS + 1] ={
         2,        3,        4,        4,        5,        6,        7,        8,        9,        10,        11,        12,
         13,        14,        15,        16,        19,        19,        19,        20,        21,        22,        24,
         25,        27,        27,        29,        30,        32,        32,        34,        34,        37,        37,
@@ -145,10 +172,18 @@ static unsigned int zen_br_tbl_420[256] ={
         372,        372,        372,        380,        380,        380,        380,        387,        387,        387,
         387,        395,        395,        395,        395,        403,        403,        403,        403,        412,
         412,        412,        412,        420,        420,        420,        420,        420,
+	[256 ... 281] = 420,
+	[282 ... 295] = 465,
+	[296 ... 309] = 488,
+	[310 ... 323] = 510,
+	[324 ... 336] = 533,
+	[337 ... 350] = 555,
+	[351 ... 364] = 578,
+	[365 ... 365] = 600
 };
 
 
-static unsigned int zen_br_tbl_420_a3[256] ={
+static unsigned int zen_br_tbl_420_a3[EXTEND_BRIGHTNESS + 1] ={
 	2,	3,	4,	4,	5,	6,	7,	8,
 	9,	10,  11,  12,  13,	14,  15,  16,
 	17,  19,  19,  20,	21,  22,  24,  25,
@@ -181,138 +216,16 @@ static unsigned int zen_br_tbl_420_a3[256] ={
 	380,  380,	380,  387,	387,  387,	387,  395,
 	395,  395,	395,  403,	403,  403,	403,  412,
 	412,  412,	412,  420,	420,  420,	420,  420,
+	[256 ... 281] = 420,
+	[282 ... 295] = 465,
+	[296 ... 309] = 488,
+	[310 ... 323] = 510,
+	[324 ... 336] = 533,
+	[337 ... 350] = 555,
+	[351 ... 364] = 578,
+	[365 ... 365] = 600
 };
-#ifdef CONFIG_LCD_BURNIN_CORRECTION
 
-static unsigned int br_tbl_LDU[7][256] = {
-{
-	2, 3, 4, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18,
-	19, 21, 21, 22, 23, 24, 27, 28, 30, 30, 32, 33, 35, 35, 38, 38,
-	41, 41, 43, 45, 45, 49, 49, 52, 52, 52, 55, 55, 59, 59, 62, 62,
-	66, 66, 66, 71, 71, 71, 75, 75, 75, 80, 80, 85, 85, 85, 85, 91,
-	91, 91, 96, 96, 96, 96, 103, 103, 103, 103, 109, 109, 109, 116, 116, 116,
-	116, 123, 123, 123, 123, 132, 132, 132, 132, 132, 140, 140, 140, 140, 140, 148,
-	148, 148, 148, 148, 158, 158, 158, 158, 158, 168, 168, 168, 168, 168, 168, 179,
-	179, 179, 179, 179, 179, 190, 190, 190, 190, 190, 203, 203, 203, 203, 203, 203,
-	203, 216, 216, 216, 216, 216, 216, 216, 229, 229, 229, 229, 229, 229, 229, 244,
-	244, 244, 244, 244, 244, 244, 259, 259, 259, 259, 259, 259, 259, 259, 276, 276,
-	276, 276, 276, 276, 276, 276, 293, 293, 293, 293, 293, 293, 293, 293, 293, 312,
-	312, 312, 312, 312, 312, 312, 312, 312, 332, 332, 332, 332, 332, 332, 332, 332,
-	332, 332, 350, 350, 350, 350, 350, 350, 350, 350, 369, 369, 369, 369, 369, 369,
-	369, 369, 369, 388, 388, 388, 388, 388, 388, 388, 388, 388, 395, 395, 395, 395,
-	404, 404, 404, 404, 412, 412, 412, 420, 420, 420, 420, 420, 420, 420, 420, 420,
-	420, 420, 420, 443, 443, 443, 443, 443, 443, 443, 443, 465, 465, 465, 465, 465,
-},
-{
-	2, 3, 5, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 19,
-	20, 22, 22, 23, 24, 26, 28, 29, 31, 31, 34, 35, 37, 37, 40, 40,
-	43, 43, 45, 48, 48, 51, 51, 55, 55, 55, 58, 58, 62, 62, 65, 65,
-	70, 70, 70, 74, 74, 74, 79, 79, 79, 84, 84, 89, 89, 89, 89, 95,
-	95, 95, 101, 101, 101, 101, 108, 108, 108, 108, 114, 114, 114, 122, 122, 122,
-	122, 129, 129, 129, 129, 138, 138, 138, 138, 138, 146, 146, 146, 146, 146, 156,
-	156, 156, 156, 156, 166, 166, 166, 166, 166, 177, 177, 177, 177, 177, 177, 188,
-	188, 188, 188, 188, 188, 200, 200, 200, 200, 200, 213, 213, 213, 213, 213, 213,
-	213, 227, 227, 227, 227, 227, 227, 227, 241, 241, 241, 241, 241, 241, 241, 256,
-	256, 256, 256, 256, 256, 256, 272, 272, 272, 272, 272, 272, 272, 272, 289, 289,
-	289, 289, 289, 289, 289, 289, 308, 308, 308, 308, 308, 308, 308, 308, 308, 328,
-	328, 328, 328, 328, 328, 328, 328, 328, 349, 349, 349, 349, 349, 349, 349, 349,
-	349, 349, 367, 367, 367, 367, 367, 367, 367, 367, 387, 387, 387, 387, 387, 387,
-	387, 387, 387, 407, 407, 407, 407, 407, 407, 407, 407, 407, 415, 415, 415, 415,
-	420, 420, 420, 420, 420, 420, 420, 420, 420, 420, 420, 443, 443, 443, 443, 443,
-	443, 443, 443, 465, 465, 465, 465, 465, 465, 465, 465, 488, 488, 488, 488, 488,
-},
-{
-	2, 4, 5, 5, 6, 7, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19,
-	21, 23, 23, 24, 26, 27, 29, 30, 33, 33, 35, 36, 39, 39, 41, 41,
-	45, 45, 47, 50, 50, 53, 53, 57, 57, 57, 61, 61, 64, 64, 68, 68,
-	73, 73, 73, 78, 78, 78, 83, 83, 83, 87, 87, 94, 94, 94, 94, 100,
-	100, 100, 106, 106, 106, 106, 113, 113, 113, 113, 119, 119, 119, 128, 128, 128,
-	128, 135, 135, 135, 135, 145, 145, 145, 145, 145, 153, 153, 153, 153, 153, 163,
-	163, 163, 163, 163, 174, 174, 174, 174, 174, 185, 185, 185, 185, 185, 185, 197,
-	197, 197, 197, 197, 197, 209, 209, 209, 209, 209, 222, 222, 222, 222, 222, 222,
-	222, 237, 237, 237, 237, 237, 237, 237, 251, 251, 251, 251, 251, 251, 251, 267,
-	267, 267, 267, 267, 267, 267, 284, 284, 284, 284, 284, 284, 284, 284, 302, 302,
-	302, 302, 302, 302, 302, 302, 322, 322, 322, 322, 322, 322, 322, 322, 322, 342,
-	342, 342, 342, 342, 342, 342, 342, 342, 364, 364, 364, 364, 364, 364, 364, 364,
-	364, 364, 384, 384, 384, 384, 384, 384, 384, 384, 404, 404, 404, 404, 404, 404,
-	404, 404, 404, 420, 420, 420, 420, 420, 420, 420, 420, 420, 420, 420, 420, 420,
-	443, 443, 443, 443, 443, 443, 443, 443, 443, 443, 443, 465, 465, 465, 465, 465,
-	465, 465, 465, 488, 488, 488, 488, 488, 488, 488, 488, 510, 510, 510, 510, 510,
-},
-{
-	3, 4, 5, 5, 6, 8, 9, 10, 11, 13, 14, 15, 16, 18, 19, 20,
-	22, 24, 24, 25, 27, 28, 30, 32, 34, 34, 37, 38, 41, 41, 43, 43,
-	47, 47, 49, 52, 52, 56, 56, 60, 60, 60, 63, 63, 67, 67, 71, 71,
-	76, 76, 76, 81, 81, 81, 86, 86, 86, 91, 91, 98, 98, 98, 98, 104,
-	104, 104, 110, 110, 110, 110, 118, 118, 118, 118, 124, 124, 124, 133, 133, 133,
-	133, 141, 141, 141, 141, 151, 151, 151, 151, 151, 160, 160, 160, 160, 160, 170,
-	170, 170, 170, 170, 181, 181, 181, 181, 181, 193, 193, 193, 193, 193, 193, 206,
-	206, 206, 206, 206, 206, 218, 218, 218, 218, 218, 232, 232, 232, 232, 232, 232,
-	232, 247, 247, 247, 247, 247, 247, 247, 263, 263, 263, 263, 263, 263, 263, 279,
-	279, 279, 279, 279, 279, 279, 297, 297, 297, 297, 297, 297, 297, 297, 316, 316,
-	316, 316, 316, 316, 316, 316, 336, 336, 336, 336, 336, 336, 336, 336, 336, 358,
-	358, 358, 358, 358, 358, 358, 358, 358, 381, 381, 381, 381, 381, 381, 381, 381,
-	381, 381, 401, 401, 401, 401, 401, 401, 401, 401, 420, 420, 420, 420, 420, 420,
-	420, 420, 420, 443, 443, 443, 443, 443, 443, 443, 443, 443, 443, 443, 443, 443,
-	443, 443, 443, 443, 465, 465, 465, 465, 465, 465, 465, 488, 488, 488, 488, 488,
-	488, 488, 488, 510, 510, 510, 510, 510, 510, 510, 510, 533, 533, 533, 533, 533,
-},
-{
-	3, 4, 5, 5, 7, 8, 9, 11, 12, 13, 15, 16, 17, 19, 20, 21,
-	22, 25, 25, 26, 28, 29, 32, 33, 36, 36, 38, 40, 42, 42, 45, 45,
-	49, 49, 52, 54, 54, 58, 58, 62, 62, 62, 66, 66, 70, 70, 74, 74,
-	79, 79, 79, 85, 85, 85, 90, 90, 90, 95, 95, 102, 102, 102, 102, 108,
-	108, 108, 115, 115, 115, 115, 123, 123, 123, 123, 130, 130, 130, 139, 139, 139,
-	139, 147, 147, 147, 147, 157, 157, 157, 157, 157, 167, 167, 167, 167, 167, 177,
-	177, 177, 177, 177, 189, 189, 189, 189, 189, 201, 201, 201, 201, 201, 201, 214,
-	214, 214, 214, 214, 214, 227, 227, 227, 227, 227, 242, 242, 242, 242, 242, 242,
-	242, 258, 258, 258, 258, 258, 258, 258, 274, 274, 274, 274, 274, 274, 274, 291,
-	291, 291, 291, 291, 291, 291, 309, 309, 309, 309, 309, 309, 309, 309, 329, 329,
-	329, 329, 329, 329, 329, 329, 350, 350, 350, 350, 350, 350, 350, 350, 350, 373,
-	373, 373, 373, 373, 373, 373, 373, 373, 396, 396, 396, 396, 396, 396, 396, 396,
-	396, 396, 420, 420, 420, 420, 420, 420, 420, 420, 420, 420, 420, 420, 420, 420,
-	420, 420, 420, 443, 443, 443, 443, 443, 443, 443, 443, 443, 465, 465, 465, 465,
-	465, 465, 465, 465, 488, 488, 488, 488, 488, 488, 488, 510, 510, 510, 510, 510,
-	510, 510, 510, 533, 533, 533, 533, 533, 533, 533, 533, 555, 555, 555, 555, 555,
-},
-{
-	3, 4, 6, 6, 7, 8, 10, 11, 12, 14, 15, 17, 18, 19, 21, 22,
-	23, 26, 26, 28, 29, 30, 33, 34, 37, 37, 40, 41, 44, 44, 47, 47,
-	51, 51, 54, 56, 56, 61, 61, 65, 65, 65, 69, 69, 73, 73, 77, 77,
-	83, 83, 83, 88, 88, 88, 94, 94, 94, 99, 99, 106, 106, 106, 106, 113,
-	113, 113, 120, 120, 120, 120, 128, 128, 128, 128, 135, 135, 135, 145, 145, 145,
-	145, 153, 153, 153, 153, 164, 164, 164, 164, 164, 173, 173, 173, 173, 173, 184,
-	184, 184, 184, 184, 197, 197, 197, 197, 197, 209, 209, 209, 209, 209, 209, 223,
-	223, 223, 223, 223, 223, 237, 237, 237, 237, 237, 252, 252, 252, 252, 252, 252,
-	252, 268, 268, 268, 268, 268, 268, 268, 285, 285, 285, 285, 285, 285, 285, 303,
-	303, 303, 303, 303, 303, 303, 322, 322, 322, 322, 322, 322, 322, 322, 343, 343,
-	343, 343, 343, 343, 343, 343, 365, 365, 365, 365, 365, 365, 365, 365, 365, 388,
-	388, 388, 388, 388, 388, 388, 388, 388, 413, 413, 413, 413, 413, 413, 413, 413,
-	413, 413, 420, 420, 420, 420, 420, 420, 420, 420, 443, 443, 443, 443, 443, 443,
-	443, 443, 443, 465, 465, 465, 465, 465, 465, 465, 465, 465, 488, 488, 488, 488,
-	488, 488, 488, 488, 510, 510, 510, 510, 510, 510, 510, 533, 533, 533, 533, 533,
-	533, 533, 533, 555, 555, 555, 555, 555, 555, 555, 555, 578, 578, 578, 578, 578,
-},
-{
-	3, 4, 6, 6, 7, 9, 10, 11, 13, 14, 16, 17, 19, 20, 21, 23,
-	24, 27, 27, 29, 30, 31, 34, 36, 39, 39, 41, 43, 46, 46, 49, 49,
-	53, 53, 56, 59, 59, 63, 63, 67, 67, 67, 71, 71, 76, 76, 80, 80,
-	86, 86, 86, 91, 91, 91, 97, 97, 97, 103, 103, 110, 110, 110, 110, 117,
-	117, 117, 124, 124, 124, 124, 133, 133, 133, 133, 140, 140, 140, 150, 150, 150,
-	150, 159, 159, 159, 159, 170, 170, 170, 170, 170, 180, 180, 180, 180, 180, 191,
-	191, 191, 191, 191, 204, 204, 204, 204, 204, 217, 217, 217, 217, 217, 217, 231,
-	231, 231, 231, 231, 231, 246, 246, 246, 246, 246, 261, 261, 261, 261, 261, 261,
-	261, 279, 279, 279, 279, 279, 279, 279, 296, 296, 296, 296, 296, 296, 296, 314,
-	314, 314, 314, 314, 314, 314, 334, 334, 334, 334, 334, 334, 334, 334, 356, 356,
-	356, 356, 356, 356, 356, 356, 379, 379, 379, 379, 379, 379, 379, 379, 379, 403,
-	403, 403, 403, 403, 403, 403, 403, 403, 420, 420, 420, 420, 420, 420, 420, 420,
-	420, 420, 443, 443, 443, 443, 443, 443, 443, 443, 465, 465, 465, 465, 465, 465,
-	465, 465, 465, 488, 488, 488, 488, 488, 488, 488, 488, 488, 510, 510, 510, 510,
-	510, 510, 510, 510, 510, 510, 510, 510, 510, 510, 510, 510, 510, 510, 510, 555,
-	555, 555, 555, 555, 555, 555, 555, 578, 578, 578, 578, 600, 600, 600, 600, 600,
-},
-};
-#endif
 static unsigned char nb_inter_aor_tbl [512] = {
         0x90, 0xE5,        0x90, 0xD1,        0x90, 0xC6,        0x90, 0xBB,        0x90, 0xA0,
         0x90, 0x82,        0x90, 0x72,        0x90, 0x5C,        0x90, 0x42,        0x90, 0x32,
@@ -472,26 +385,6 @@ static unsigned char zen_inter_aor_tbl_a3[512] = {
 	0x00, 0x73,   0x00, 0x62,	0x00, 0x52,   0x00, 0x40,	0x00, 0x2E,   0x00, 0x1C,	0x00, 0x0A,   0x00, 0x34,	0x00, 0x26,   0x00, 0x18,	0x00, 0x0A,   0x00, 0x2F,	0x00, 0x23,   0x00, 0x16,	0x00, 0x0A,   0x00, 0x0A,
 };
 
-
-
-static const unsigned int hbm_interpolation_br_tbl[256] = {
-	2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-	17, 19, 20, 21, 22, 23, 24, 25, 25, 27, 29, 30, 32, 34, 37, 37,
-	39, 41, 44, 47, 50, 53, 56, 60, 64, 68, 68, 72, 72, 77, 82, 82,
-	87, 87, 93, 93, 98, 98, 98, 105, 105, 105, 111, 111, 111, 119, 119, 119,
-	126, 126, 126, 126, 134, 134, 134, 143, 143, 143, 143, 152, 152, 152, 152, 162,
-	162, 162, 162, 172, 172, 172, 172, 172, 183, 183, 183, 183, 183, 183, 183, 183,
-	183, 183, 195, 195, 195, 195, 195, 207, 207, 207, 207, 207, 207, 220, 220, 220,
-	220, 220, 220, 220, 234, 234, 234, 234, 234, 234, 249, 249, 249, 249, 249, 249,
-	249, 249, 265, 265, 265, 265, 265, 265, 265, 282, 282, 282, 282, 282, 282, 282,
-	282, 300, 300, 300, 300, 300, 300, 316, 316, 316, 316, 316, 316, 316, 333, 333,
-	333, 333, 333, 333, 350, 350, 350, 350, 357, 357, 357, 357, 357, 357, 357, 357,
-	357, 365, 365, 365, 365, 372, 372, 372, 372, 372, 372, 380, 380, 380, 380, 403,
-	403, 403, 403, 403, 403, 412, 412, 412, 412, 412, 412, 420, 420, 420, 420, 420,
-	420, 420, 420, 420, 420, 443, 443, 443, 443, 443, 443, 443, 443, 465, 465, 465,
-	465, 488, 488, 488, 488, 488, 488, 510, 510, 510, 510, 510, 533, 533, 533, 533,
-	533, 533, 555, 555, 555, 555, 555, 555, 555, 578, 578, 578, 578, 578, 578, 600
-};
 
 static const short center_gamma[NUM_VREF][CI_MAX] = {
 	{ 0x000, 0x000, 0x000 },
@@ -1001,7 +894,7 @@ static int init_dimming(struct dsim_device *dsim, u8 * mtp, u8 * hbm)
 	int     ret = 0;
 	short   temp;
 	int     method = 0;
-    static struct dim_data *dimming = NULL;
+	static struct dim_data *dimming = NULL;
 	unsigned char panel_rev = 0x00;
 	unsigned char panel_line = 0x00;
 
@@ -1022,12 +915,7 @@ static int init_dimming(struct dsim_device *dsim, u8 * mtp, u8 * hbm)
 	panel_rev = panel->id[2] & 0x0F;
 
 	dsim_info("%s panel line : %x,  Panel rev : %x\n",__func__, panel_line, panel_rev);
-	panel->hbm_inter_br_tbl = NULL;
-#ifdef CONFIG_LCD_BURNIN_CORRECTION
-	panel->ldu_correction_state = 0;
-	for(i = 1; i < 8; i++)
-		panel->ldu_tbl[i] = br_tbl_LDU[i - 1];
-#endif
+
 	switch (dynamic_lcd_type) {
 	case LCD_TYPE_S6E3HA2_WQHD:
 		dsim_info("%s init dimming info for daisy HA2 rev.E panel\n", __func__);
@@ -1037,10 +925,6 @@ static int init_dimming(struct dsim_device *dsim, u8 * mtp, u8 * hbm)
 		memcpy(aid_dimming_dynamic.elvss_minus_offset, ELVSS_OFFSET_HA2, sizeof(aid_dimming_dynamic.elvss_minus_offset));
 		panel->br_tbl = (unsigned int *)br_tbl;
 		panel->inter_aor_tbl = (unsigned char *)nb_inter_aor_tbl;
-#ifdef CONFIG_LCD_BURNIN_CORRECTION
-		for(i = 0; i < 8; i++)
-			panel->ldu_tbl[i] = NULL;
-#endif
 		break;
 	case LCD_TYPE_S6E3HA3_WQHD:
 		dsim_info("%s init dimming info for daisy HA3 pre panel\n", __func__);
@@ -1048,20 +932,15 @@ static int init_dimming(struct dsim_device *dsim, u8 * mtp, u8 * hbm)
 		panel->acl_opr_tbl = (unsigned char **)ACL_OPR_TABLE_HA3;
 		memcpy(aid_dimming_dynamic.vint_dim_offset, VINT_TABLE_HA3, sizeof(aid_dimming_dynamic.vint_dim_offset));
 		memcpy(aid_dimming_dynamic.elvss_minus_offset, ELVSS_OFFSET_HA3, sizeof(aid_dimming_dynamic.elvss_minus_offset));
-		panel->hbm_inter_br_tbl = (unsigned int *)hbm_interpolation_br_tbl;
 		panel->inter_aor_tbl = (unsigned char *)nb_inter_aor_tbl;
-#ifdef CONFIG_LCD_BURNIN_CORRECTION
-		panel->ldu_tbl[0] = panel->br_tbl = (unsigned int *)nb_br_tbl_420;
-#endif
+		panel->br_tbl = (unsigned int *)nb_br_tbl_420;
 		break;
 	case LCD_TYPE_S6E3HF3_WQHD:
 		switch(panel_line) {
 		// code
 		case S6E3HF3_A2_INIT_ID:
 		case S6E3HF3_A2_REV01_ID:
-#ifdef CONFIG_LCD_BURNIN_CORRECTION
-			panel->ldu_tbl[0] = panel->br_tbl = (unsigned int *)zen_br_tbl_420;
-#endif
+			panel->br_tbl = (unsigned int *)zen_br_tbl_420;
 			if(panel_rev <= 3) {
 				dsim_info("%s init dimming info for daisy HF3 panel under C\n", __func__);
 				diminfo = (void *)dimming_info_HF3;
@@ -1074,9 +953,7 @@ static int init_dimming(struct dsim_device *dsim, u8 * mtp, u8 * hbm)
 			break;
 		case S6E3HF3_A3_REV01_ID:
 			diminfo = (void *)dimming_info_HF3_A3;
-#ifdef CONFIG_LCD_BURNIN_CORRECTION
-			panel->ldu_tbl[0] = panel->br_tbl = (unsigned int *)zen_br_tbl_420_a3;
-#endif
+			panel->br_tbl = (unsigned int *)zen_br_tbl_420_a3;
 			panel->inter_aor_tbl = (unsigned char*)zen_inter_aor_tbl_a3;
 			break;
 		default:
@@ -1090,7 +967,6 @@ static int init_dimming(struct dsim_device *dsim, u8 * mtp, u8 * hbm)
 		panel->acl_opr_tbl = (unsigned char **)ACL_OPR_TABLE_HF3;
 		memcpy(aid_dimming_dynamic.vint_dim_offset, VINT_TABLE_HF3, sizeof(aid_dimming_dynamic.vint_dim_offset));
 		memcpy(aid_dimming_dynamic.elvss_minus_offset, ELVSS_OFFSET_HF3, sizeof(aid_dimming_dynamic.elvss_minus_offset));
-		panel->hbm_inter_br_tbl = (unsigned int *)hbm_interpolation_br_tbl;
 		break;
 	default:
 		dsim_info("%s init dimming info for daisy (UNKNOWN) HA2 panel\n", __func__);
@@ -1109,8 +985,6 @@ static int init_dimming(struct dsim_device *dsim, u8 * mtp, u8 * hbm)
 
 	panel->hbm_tbl = (unsigned char **)HBM_TABLE;
 	panel->acl_cutoff_tbl = (unsigned char **)ACL_CUTOFF_TABLE;
-	panel->hbm_index = MAX_BR_INFO - 1;
-	panel->hbm_elvss_comp = S6E3HA2_HBM_ELVSS_COMP;
 
 	for (j = 0; j < CI_MAX; j++) {
 		temp = ((mtp[pos] & 0x01) ? -1 : 1) * mtp[pos + 1];
@@ -1211,7 +1085,7 @@ error:
 
 
 #ifdef CONFIG_LCD_HMT
-static const unsigned int hmt_br_tbl[256] = {
+static const unsigned int hmt_br_tbl[EXTEND_BRIGHTNESS + 1] = {
 	10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
 	10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 12, 12,
 	13, 13, 14, 14, 14, 15, 15, 16, 16, 16, 17, 17, 17, 17, 17, 19,
@@ -1227,7 +1101,8 @@ static const unsigned int hmt_br_tbl[256] = {
 	77, 77, 77, 77, 77, 77, 77, 77, 82, 82, 82, 82, 82, 82, 82, 82,
 	82, 82, 82, 82, 87, 87, 87, 87, 87, 87, 87, 87, 87, 87, 87, 87,
 	87, 87, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93, 93,
-	93, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 105
+	93, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 105,
+	[UI_MAX_BRIGHTNESS + 1 ... EXTEND_BRIGHTNESS] = 105
 };
 
 struct SmtDimInfo hmt_dimming_info_HA3[HMT_MAX_BR_INFO] = {
@@ -1751,6 +1626,54 @@ static int s6e3ha2_wqhd_exit(struct dsim_device *dsim)
         return ret;
 }
 
+#if defined(CONFIG_FB_DSU)
+static int _s6e3ha2_wqhd_dsu_command(struct dsim_device *dsim, int xres, int yres)
+{
+	int ret = 0;
+
+	switch( xres ) {
+	case 1080:
+		ret = dsim_write_hl_data(dsim, S6E3HA2_SEQ_DDI_SCALER_FHD_00, ARRAY_SIZE(S6E3HA2_SEQ_DDI_SCALER_FHD_00));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HA2_SEQ_DDI_SCALER_FHD_00\n", __func__);
+		}
+	break;
+	case 1440:
+		ret = dsim_write_hl_data(dsim, S6E3HA2_SEQ_DDI_SCALER_WQHD_00, ARRAY_SIZE(S6E3HA2_SEQ_DDI_SCALER_WQHD_00));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HA2_SEQ_DDI_SCALER_WQHD_00\n", __func__);
+		}
+	break;
+	default:
+		dsim_err("%s : xres=%d, yres=%d, Unknown\n", __func__, xres, yres );
+	break;
+	}
+
+	dsim_info("%s : xres=%d, yres=%d\n", __func__, xres, yres );
+	return ret;
+}
+
+static int s6e3ha2_wqhd_dsu_command(struct dsim_device *dsim)
+{
+	int ret = 0;
+
+	ret = dsim_write_hl_data(dsim, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
+	if (ret < 0) {
+		dsim_err("%s : fail to write CMD : SEQ_TEST_KEY_ON_F0\n", __func__);
+	}
+
+	ret = _s6e3ha2_wqhd_dsu_command( dsim, dsim->dsu_xres, dsim->dsu_yres );
+
+	ret = dsim_write_hl_data(dsim, SEQ_TEST_KEY_OFF_FC, ARRAY_SIZE(SEQ_TEST_KEY_OFF_FC));
+	if (ret < 0) {
+		dsim_err("%s : fail to write CMD : SEQ_TEST_KEY_ON_FC\n", __func__);
+	}
+
+	dsim_info("%s : xres=%d, yres=%d\n", __func__, dsim->dsu_xres, dsim->dsu_yres);
+	return ret;
+}
+#endif
+
 static int s6e3ha2_wqhd_init(struct dsim_device *dsim)
 {
         int     ret = 0;
@@ -1788,6 +1711,11 @@ static int s6e3ha2_wqhd_init(struct dsim_device *dsim)
                 dsim_err("%s : fail to write CMD : SEQ_SINGLE_DSI_2\n", __func__);
                 goto init_exit;
         }
+
+#ifdef CONFIG_FB_DSU
+	ret = _s6e3ha2_wqhd_dsu_command( dsim, dsim->dsu_xres, dsim->dsu_yres );
+#endif
+
 #ifdef CONFIG_LCD_HMT
         if (dsim->priv.hmt_on != HMT_ON)
 #endif
@@ -1933,6 +1861,9 @@ struct dsim_panel_ops s6e3ha2_panel_ops = {
         .exit = s6e3ha2_wqhd_exit,
         .init = s6e3ha2_wqhd_init,
         .dump = s6e3ha2_wqhd_dump,
+#ifdef CONFIG_FB_DSU
+	.dsu_cmd = s6e3ha2_wqhd_dsu_command,
+#endif
 };
 
 /************************************ HA3 *****************************************/
@@ -2249,7 +2180,7 @@ static int s6e3ha3_wqhd_probe(struct dsim_device *dsim)
 	if ((panel->id[2] & 0x0F) < 2)	// under rev.B
 		dsim->priv.esd_disable = 1;
 	else dsim->priv.esd_disable = 0;
-	panel->auto_brightness_level = AUTOBRIGHTNESS_LEVEL;
+
 #ifdef CONFIG_PANEL_AID_DIMMING
 	ret = init_dimming(dsim, mtp, hbm);
 	if (ret) {
@@ -2312,6 +2243,131 @@ static int s6e3ha3_wqhd_exit(struct dsim_device *dsim)
 exit_err:
 	return ret;
 }
+
+#if defined(CONFIG_FB_DSU)
+#undef CONFIG_HA3_CASET_PASET_CHECK
+static int _s6e3ha3_wqhd_dsu_command(struct dsim_device *dsim, int xres, int yres )
+{
+	int ret = 0;
+	unsigned char read_reg[3] = {0xFF,};
+#ifdef CONFIG_HA3_CASET_PASET_CHECK
+	const unsigned char SEQ_HA3_CASET_PASET_GPARAM[] = { 0xB0, 0x13 };
+	const unsigned char REG_HA3_CASET_PASET = 0xFB;
+	const unsigned char size_ha3_caset_paset = 8;
+	char	buffer_caset_paset[size_ha3_caset_paset+4];
+	u16 *pint16;
+	int i;
+#endif
+
+	switch( xres ) {
+	case 720:
+		dsim_err("%s : xres=%d, yres=%d : HD\n", __func__, xres, yres );
+		ret = dsim_write_hl_data(dsim, S6E3HA3_SEQ_DDI_SCALER_HD_00, ARRAY_SIZE(S6E3HA3_SEQ_DDI_SCALER_HD_00));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HA3_SEQ_DDI_SCALER_HD_00\n", __func__);
+		}
+
+		ret = dsim_read_hl_data(dsim, S6E3HA3_SEQ_DDI_SCALER_HD_00[0], ARRAY_SIZE(S6E3HA3_SEQ_DDI_SCALER_HD_00) - 1 , read_reg);
+
+		if(read_reg[0] != S6E3HA3_SEQ_DDI_SCALER_HD_00[1]) {
+			dsim_err("%s : mis-match BA register %x %x\n", __func__, read_reg[0], S6E3HA3_SEQ_DDI_SCALER_HD_00[1]);
+			ret = dsim_write_hl_data(dsim, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
+			ret = dsim_write_hl_data(dsim, S6E3HA3_SEQ_DDI_SCALER_HD_00, ARRAY_SIZE(S6E3HA3_SEQ_DDI_SCALER_HD_00));
+		} else {
+			dsim_info("%s : read value %x\n", __func__, read_reg[0]);
+		}
+
+		ret = dsim_write_hl_data(dsim, S6E3HA3_SEQ_DDI_SCALER_HD_01, ARRAY_SIZE(S6E3HA3_SEQ_DDI_SCALER_HD_01));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HA3_SEQ_DDI_SCALER_HD_01\n", __func__);
+		}
+		ret = dsim_write_hl_data(dsim, S6E3HA3_SEQ_DDI_SCALER_HD_02, ARRAY_SIZE(S6E3HA3_SEQ_DDI_SCALER_HD_02));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HA3_SEQ_DDI_SCALER_HD_02\n", __func__);
+		}
+	break;
+	case 1080:
+		dsim_err("%s : xres=%d, yres=%d : FHD\n", __func__, xres, yres );
+		ret = dsim_write_hl_data(dsim, S6E3HA3_SEQ_DDI_SCALER_FHD_00, ARRAY_SIZE(S6E3HA3_SEQ_DDI_SCALER_FHD_00));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HA3_SEQ_DDI_SCALER_FHD_00\n", __func__);
+		}
+
+		ret = dsim_read_hl_data(dsim, S6E3HA3_SEQ_DDI_SCALER_FHD_00[0], ARRAY_SIZE(S6E3HA3_SEQ_DDI_SCALER_FHD_00) - 1 , read_reg);
+
+		if(read_reg[0] != S6E3HA3_SEQ_DDI_SCALER_FHD_00[1]) {
+			dsim_err("%s : mis-match BA register %x %x\n", __func__, read_reg[0], S6E3HA3_SEQ_DDI_SCALER_FHD_00[1]);
+			ret = dsim_write_hl_data(dsim, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
+			ret = dsim_write_hl_data(dsim, S6E3HA3_SEQ_DDI_SCALER_FHD_00, ARRAY_SIZE(S6E3HA3_SEQ_DDI_SCALER_FHD_00));
+		} else {
+			dsim_info("%s : read value %x\n", __func__, read_reg[0]);
+		}
+		ret = dsim_write_hl_data(dsim, S6E3HA3_SEQ_DDI_SCALER_FHD_01, ARRAY_SIZE(S6E3HA3_SEQ_DDI_SCALER_FHD_01));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HA3_SEQ_DDI_SCALER_FHD_01\n", __func__);
+		}
+		ret = dsim_write_hl_data(dsim, S6E3HA3_SEQ_DDI_SCALER_FHD_02, ARRAY_SIZE(S6E3HA3_SEQ_DDI_SCALER_FHD_02));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HA3_SEQ_DDI_SCALER_FHD_02\n", __func__);
+		}
+	break;
+	case 1440:
+		dsim_err("%s : xres=%d, yres=%d : WQHD\n", __func__, xres, yres );
+		ret = dsim_write_hl_data(dsim, S6E3HA3_SEQ_DDI_SCALER_WQHD_00, ARRAY_SIZE(S6E3HA3_SEQ_DDI_SCALER_WQHD_00));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HA3_SEQ_DDI_SCALER_WQHD_00\n", __func__);
+		}
+		ret = dsim_read_hl_data(dsim, S6E3HA3_SEQ_DDI_SCALER_WQHD_00[0], ARRAY_SIZE(S6E3HA3_SEQ_DDI_SCALER_WQHD_00) - 1 , read_reg);
+
+		if(read_reg[0] != S6E3HA3_SEQ_DDI_SCALER_WQHD_00[1]) {
+			dsim_err("%s : mis-match BA register %x %x\n", __func__, read_reg[0], S6E3HA3_SEQ_DDI_SCALER_WQHD_00[1]);
+			ret = dsim_write_hl_data(dsim, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
+			ret = dsim_write_hl_data(dsim, S6E3HA3_SEQ_DDI_SCALER_WQHD_00, ARRAY_SIZE(S6E3HA3_SEQ_DDI_SCALER_WQHD_00));
+		} else {
+			dsim_info("%s : read value %x\n", __func__, read_reg[0]);
+		}
+	break;
+	default:
+		dsim_err("%s : xres=%d, yres=%d : default\n", __func__, xres, yres );
+	break;
+	}
+
+
+#ifdef CONFIG_HA3_CASET_PASET_CHECK
+	ret = dsim_write_hl_data(dsim, SEQ_HA3_CASET_PASET_GPARAM, ARRAY_SIZE(SEQ_HA3_CASET_PASET_GPARAM));
+	ret = dsim_read_hl_data(dsim, REG_HA3_CASET_PASET, size_ha3_caset_paset, buffer_caset_paset);
+	pint16 = (u16*) buffer_caset_paset;
+	for( i = 0; i < size_ha3_caset_paset/sizeof(pint16[0]); i++ ) {
+		pint16[i] = ((pint16[i] & 0xF0) >> 4) + ((pint16[i]&0x0F)<<4);
+	}
+	dsim_info( "%s.%d (dsu) caset paset(%d) : %d, %d, %d, %d\n", __func__, __LINE__, ret, pint16[0], pint16[1], pint16[2], pint16[3] );
+#endif
+
+	return ret;
+}
+#endif
+
+#ifdef CONFIG_FB_DSU
+static int s6e3ha3_wqhd_dsu_command(struct dsim_device *dsim)
+{
+	int ret = 0;
+
+	ret = dsim_write_hl_data(dsim, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
+	if (ret < 0) {
+		dsim_err("%s : fail to write CMD : SEQ_TEST_KEY_ON_F0\n", __func__);
+	}
+
+	ret = _s6e3ha3_wqhd_dsu_command( dsim, dsim->dsu_xres, dsim->dsu_yres );
+
+	ret = dsim_write_hl_data(dsim, SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0));
+	if (ret < 0) {
+		dsim_err("%s : fail to write CMD : SEQ_TEST_KEY_OFF_F0\n", __func__);
+	}
+
+	dsim_info("%s : xres=%d, yres=%d\n", __func__, dsim->dsu_xres, dsim->dsu_yres);
+	return ret;
+}
+#endif
 
 static int s6e3ha3_wqhd_init(struct dsim_device *dsim)
 {
@@ -2382,6 +2438,11 @@ static int s6e3ha3_wqhd_init(struct dsim_device *dsim)
 		}
 		dsim_info("%s max77838 system rev : %d\n", __func__, hw_rev);
 	}
+
+#ifdef CONFIG_FB_DSU
+	ret = _s6e3ha3_wqhd_dsu_command( dsim, dsim->dsu_xres, dsim->dsu_yres );
+#endif
+
 #ifdef CONFIG_LCD_HMT
 		if(dsim->priv.hmt_on != HMT_ON)
 #endif
@@ -2509,6 +2570,9 @@ struct dsim_panel_ops s6e3ha3_panel_ops = {
 	.exit = s6e3ha3_wqhd_exit,
 	.init = s6e3ha3_wqhd_init,
 	.dump = s6e3ha3_wqhd_dump,
+#ifdef CONFIG_FB_DSU
+	.dsu_cmd = s6e3ha3_wqhd_dsu_command,
+#endif
 };
 
 /******************** HF3 ********************/
@@ -2773,7 +2837,6 @@ static int s6e3hf3_wqhd_probe(struct dsim_device *dsim)
 	else
 		dsim->priv.esd_disable = 0;
 
-	panel->auto_brightness_level = AUTOBRIGHTNESS_LEVEL;
 
 
 	/* test */
@@ -2912,6 +2975,141 @@ static int s6e3hf3_read_reg_status(struct dsim_device *dsim, bool need_key_unloc
 }
 
 
+#if defined(CONFIG_FB_DSU) || defined(CONFIG_LCD_RES)
+#undef CONFIG_HF3_CASET_PASET_CHECK
+static int _s6e3hf3_wqhd_dsu_command(struct dsim_device *dsim, int xres, int yres )
+{
+	int ret = 0;
+	unsigned char read_reg[3] = {0xFF, };
+#ifdef CONFIG_HF3_CASET_PASET_CHECK
+	const unsigned char SEQ_HF3_CASET_PASET_GPARAM[] = { 0xB0, 0x13 };
+	const unsigned char REG_HF3_CASET_PASET = 0xFB;
+	const unsigned char size_hf3_caset_paset = 8;
+	char	buffer_caset_paset[size_hf3_caset_paset+4];
+	u16 *pint16;
+	int i;
+#endif
+
+	switch( xres ) {
+	case 720:
+		dsim->glide_display_size = 40;
+		dsim_err("%s : xres=%d, yres=%d : HD\n", __func__, xres, yres );
+
+		ret = dsim_write_hl_data(dsim, S6E3HF3_SEQ_DDI_SCALER_HD_00, ARRAY_SIZE(S6E3HF3_SEQ_DDI_SCALER_HD_00));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HF3_SEQ_DDI_SCALER_HD_00\n", __func__);
+		}
+
+		ret = dsim_read_hl_data(dsim, S6E3HF3_SEQ_DDI_SCALER_HD_00[0], ARRAY_SIZE(S6E3HF3_SEQ_DDI_SCALER_HD_00) - 1 , read_reg);
+
+		if(read_reg[0] != S6E3HF3_SEQ_DDI_SCALER_HD_00[1]) {
+			dsim_err("%s : mis-match BA register %x %x\n", __func__, read_reg[0], S6E3HF3_SEQ_DDI_SCALER_HD_00[1]);
+			ret = dsim_write_hl_data(dsim, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
+			ret = dsim_write_hl_data(dsim, S6E3HA3_SEQ_DDI_SCALER_HD_00, ARRAY_SIZE(S6E3HA3_SEQ_DDI_SCALER_HD_00));
+		} else {
+			dsim_info("%s : read value %x\n", __func__, read_reg[0]);
+		}
+
+		ret = dsim_write_hl_data(dsim, S6E3HF3_SEQ_DDI_SCALER_HD_01, ARRAY_SIZE(S6E3HF3_SEQ_DDI_SCALER_HD_01));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HF3_SEQ_DDI_SCALER_HD_01\n", __func__);
+		}
+		ret = dsim_write_hl_data(dsim, S6E3HF3_SEQ_DDI_SCALER_HD_02, ARRAY_SIZE(S6E3HF3_SEQ_DDI_SCALER_HD_02));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HF3_SEQ_DDI_SCALER_HD_02\n", __func__);
+		}
+	break;
+	case 1080:
+		dsim->glide_display_size = 60;
+		dsim_err("%s : xres=%d, yres=%d : FHD\n", __func__, xres, yres );
+
+		ret = dsim_write_hl_data(dsim, S6E3HF3_SEQ_DDI_SCALER_FHD_00, ARRAY_SIZE(S6E3HF3_SEQ_DDI_SCALER_FHD_00));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HF3_SEQ_DDI_SCALER_FHD_00\n", __func__);
+		}
+
+		ret = dsim_read_hl_data(dsim, S6E3HF3_SEQ_DDI_SCALER_FHD_00[0], ARRAY_SIZE(S6E3HF3_SEQ_DDI_SCALER_FHD_00) - 1 , read_reg);
+
+		if(read_reg[0] != S6E3HF3_SEQ_DDI_SCALER_FHD_00[1]) {
+			dsim_err("%s : mis-match BA register %x %x\n", __func__, read_reg[0], S6E3HF3_SEQ_DDI_SCALER_FHD_00[1]);
+			ret = dsim_write_hl_data(dsim, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
+			ret = dsim_write_hl_data(dsim, S6E3HF3_SEQ_DDI_SCALER_FHD_00, ARRAY_SIZE(S6E3HF3_SEQ_DDI_SCALER_FHD_00));
+		} else {
+			dsim_info("%s : read value %x\n", __func__, read_reg[0]);
+		}
+
+		ret = dsim_write_hl_data(dsim, S6E3HF3_SEQ_DDI_SCALER_FHD_01, ARRAY_SIZE(S6E3HF3_SEQ_DDI_SCALER_FHD_01));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HF3_SEQ_DDI_SCALER_FHD_01\n", __func__);
+		}
+		ret = dsim_write_hl_data(dsim, S6E3HF3_SEQ_DDI_SCALER_FHD_02, ARRAY_SIZE(S6E3HF3_SEQ_DDI_SCALER_FHD_02));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HF3_SEQ_DDI_SCALER_FHD_02\n", __func__);
+		}
+	break;
+	case 1440:
+		dsim->glide_display_size = 80;	// framebuffer of LCD is 1600x2560, display area is 1440x2560, glidesize = (1600-1440)/2
+		dsim_err("%s : xres=%d, yres=%d : WQHD\n", __func__, xres, yres );
+
+		ret = dsim_write_hl_data(dsim, S6E3HF3_SEQ_DDI_SCALER_WQHD_00, ARRAY_SIZE(S6E3HF3_SEQ_DDI_SCALER_WQHD_00));
+		if (ret < 0) {
+			dsim_err("%s : fail to write CMD : S6E3HF3_SEQ_DDI_SCALER_WQHD_00\n", __func__);
+		}
+
+		ret = dsim_read_hl_data(dsim, S6E3HF3_SEQ_DDI_SCALER_WQHD_00[0], ARRAY_SIZE(S6E3HF3_SEQ_DDI_SCALER_WQHD_00) - 1 , read_reg);
+
+		if(read_reg[0] != S6E3HF3_SEQ_DDI_SCALER_WQHD_00[1]) {
+			dsim_err("%s : mis-match BA register %x %x\n", __func__, read_reg[0], S6E3HF3_SEQ_DDI_SCALER_WQHD_00[1]);
+			ret = dsim_write_hl_data(dsim, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
+			ret = dsim_write_hl_data(dsim, S6E3HF3_SEQ_DDI_SCALER_WQHD_00, ARRAY_SIZE(S6E3HF3_SEQ_DDI_SCALER_WQHD_00));
+		} else {
+			dsim_info("%s : read value %x\n", __func__, read_reg[0]);
+		}
+
+	break;
+	default:
+		dsim->glide_display_size = 80;	// framebuffer of LCD is 1600x2560, display area is 1440x2560, glidesize = (1600-1440)/2
+		dsim_err("%s : xres=%d, yres=%d : default\n", __func__, xres, yres );
+	break;
+	}
+
+
+#ifdef CONFIG_HF3_CASET_PASET_CHECK
+	ret = dsim_write_hl_data(dsim, SEQ_HF3_CASET_PASET_GPARAM, ARRAY_SIZE(SEQ_HF3_CASET_PASET_GPARAM));
+	ret = dsim_read_hl_data(dsim, REG_HF3_CASET_PASET, size_hf3_caset_paset, buffer_caset_paset);
+	pint16 = (u16*) buffer_caset_paset;
+	for( i = 0; i < size_hf3_caset_paset/sizeof(pint16[0]); i++ ) {
+		pint16[i] = ((pint16[i] & 0xF0) >> 4) + ((pint16[i]&0x0F)<<4);
+	}
+	dsim_info( "%s.%d (dsu) caset paset(%d) : %d, %d, %d, %d\n", __func__, __LINE__, ret, pint16[0], pint16[1], pint16[2], pint16[3] );
+#endif
+
+	return ret;
+}
+#endif
+
+#ifdef CONFIG_FB_DSU
+static int s6e3hf3_wqhd_dsu_command(struct dsim_device *dsim)
+{
+	int ret = 0;
+
+	ret = dsim_write_hl_data(dsim, SEQ_TEST_KEY_ON_F0, ARRAY_SIZE(SEQ_TEST_KEY_ON_F0));
+	if (ret < 0) {
+		dsim_err("%s : fail to write CMD : SEQ_TEST_KEY_ON_F0\n", __func__);
+	}
+
+	ret = _s6e3hf3_wqhd_dsu_command( dsim, dsim->dsu_xres, dsim->dsu_yres );
+
+	ret = dsim_write_hl_data(dsim, SEQ_TEST_KEY_OFF_F0, ARRAY_SIZE(SEQ_TEST_KEY_OFF_F0));
+	if (ret < 0) {
+		dsim_err("%s : fail to write CMD : SEQ_TEST_KEY_OFF_F0\n", __func__);
+	}
+
+	dsim_info("%s : xres=%d, yres=%d\n", __func__, dsim->dsu_xres, dsim->dsu_yres);
+	return ret;
+}
+#endif
+
 static int s6e3hf3_wqhd_init(struct dsim_device *dsim)
 {
 	int ret = 0;
@@ -2979,6 +3177,11 @@ static int s6e3hf3_wqhd_init(struct dsim_device *dsim)
 		dsim_err("%s : fail to write CMD : S6E3HF3_SEQ_MIC\n", __func__);
 		goto init_exit;
 	}
+
+#ifdef CONFIG_FB_DSU
+	ret = _s6e3hf3_wqhd_dsu_command( dsim, dsim->dsu_xres, dsim->dsu_yres );
+#endif
+
 #ifdef CONFIG_LCD_HMT
 		if(dsim->priv.hmt_on != HMT_ON)
 #endif
@@ -3107,6 +3310,9 @@ struct dsim_panel_ops s6e3hf3_panel_ops = {
 	.exit = s6e3hf3_wqhd_exit,
 	.init = s6e3hf3_wqhd_init,
 	.dump = s6e3hf3_wqhd_dump,
+#ifdef CONFIG_FB_DSU
+	.dsu_cmd = s6e3hf3_wqhd_dsu_command,
+#endif
 };
 
 

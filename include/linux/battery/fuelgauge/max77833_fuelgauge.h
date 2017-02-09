@@ -29,6 +29,8 @@
 #include <linux/mfd/max77833-private.h>
 #include <linux/regulator/machine.h>
 
+#include <linux/sec_batt.h>
+
 /* Slave address should be shifted to the right 1bit.
  * R/W bit should NOT be included.
  */
@@ -40,6 +42,13 @@
 #define MAX_LOW_BATT_CHECK_CNT	10
 
 #define ALERT_EN 0x04
+
+enum max77833_vempty_mode {
+	VEMPTY_MODE_HW = 0,
+	VEMPTY_MODE_SW,
+	VEMPTY_MODE_SW_VALERT,
+	VEMPTY_MODE_SW_RECOVERY,
+};
 
 #define MAX77833_FG_VMN_IM		(1 << 0)
 #define MAX77833_FG_VMX_IM		(1 << 1)
@@ -54,12 +63,6 @@ struct sec_fuelgauge_reg_data {
 	u8 reg_addr;
 	u8 reg_data1;
 	u8 reg_data2;
-};
-
-enum max77833_valrt_mode {
-	MAX77833_NORMAL_MODE = 0,
-	MAX77833_VEMPTY_MODE,
-	MAX77833_VEMPTY_RECOVERY_MODE,
 };
 
 struct max77833_fg_info {
@@ -124,6 +127,8 @@ enum {
 struct battery_data_t {
 	u32 V_empty;
 	u32 V_empty_origin;
+	u32 sw_v_empty_vol;
+	u32 sw_v_empty_recover_vol;	
 	u32 QResidual20;
 	u32 QResidual30;
 	u32 Capacity;
@@ -217,7 +222,8 @@ struct max77833_fuelgauge_data {
 	bool using_temp_compensation;
 	bool low_temp_compensation_en;
 	bool using_hw_vempty;
-	bool hw_v_empty;
+	unsigned int vempty_mode;
+	int temperature;
 	int sw_v_empty;
 
 	unsigned int low_temp_limit;

@@ -743,6 +743,7 @@ int parse_dataframe(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 	u16 length = 0;
 
 	struct sensor_value sensorsdata;
+	char msg_inst = 0;
 	u16 batch_event_count;
 	u16 batch_mode;
 
@@ -751,13 +752,13 @@ int parse_dataframe(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 	data->uIrqCnt++;
 
 	for (iDataIdx = 0; iDataIdx < iLength;) {
-		switch (pchRcvDataFrame[iDataIdx++]) {
+		switch (msg_inst = pchRcvDataFrame[iDataIdx++]) {
 		case MSG2AP_INST_BYPASS_DATA:
 			sensor_type = pchRcvDataFrame[iDataIdx++];
 			if ((sensor_type < 0) || (sensor_type >= SENSOR_MAX)) {
 				pr_err("[SSP]: %s - Mcu data frame1 error %d\n", __func__,
 						sensor_type);
-				return ERROR;
+				goto error_return;
 			}
 
 			memcpy(&length, pchRcvDataFrame + iDataIdx, 2);
@@ -768,6 +769,8 @@ int parse_dataframe(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 
 			// TODO: When batch_event_count = 0, we should not run.
 			do {
+                if(data->get_sensor_data[sensor_type] == NULL)
+                    goto error_return;
 				data->get_sensor_data[sensor_type](pchRcvDataFrame, &iDataIdx, &sensorsdata);
 				// TODO: Integrate get_sensor_data function.
 				// TODO: get_sensor_data(pchRcvDataFrame, &iDataIdx, &sensorsdata, data->sensor_data_size[sensor_type]);
@@ -808,6 +811,15 @@ int parse_dataframe(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 		case MSG2AP_INST_META_DATA:
 			sensorsdata.meta_data.what = pchRcvDataFrame[iDataIdx++];
 			sensorsdata.meta_data.sensor = pchRcvDataFrame[iDataIdx++];
+			
+			if(sensorsdata.meta_data.what != 1)
+				goto error_return;
+			
+			if ((sensorsdata.meta_data.sensor < 0) || (sensorsdata.meta_data.sensor >= SENSOR_MAX)) {
+				pr_err("[SSP]: %s - Mcu meta_data frame1 error %d\n", __func__,
+						sensorsdata.meta_data.sensor);
+				goto error_return;
+			}
 			report_meta_data(data, &sensorsdata);
 			break;
 		case MSG2AP_INST_TIME_SYNC:
@@ -824,10 +836,24 @@ int parse_dataframe(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 		case SH_MSG2AP_GYRO_CALIBRATION_EVENT_OCCUR:
 			data->gyro_lib_state = GYRO_CALIBRATION_STATE_EVENT_OCCUR;
 			break;
+        default :
+            goto error_return;
 		}
 	}
-
+	if(data->pktErrCnt >= 1) // if input error packet doesn't comes continually, do not reset
+		data->pktErrCnt = 0;
 	return SUCCESS;
+error_return:
+    pr_err("[SSP] %s err Inst 0x%02x\n", __func__, msg_inst);
+    data->pktErrCnt++;
+	if(data->pktErrCnt >= 2)
+	{
+		pr_err("[SSP] %s packet is polluted\n", __func__);
+		data->mcuAbnormal = true;
+		data->pktErrCnt = 0; 
+		data->errorCount++;
+	}
+    return ERROR;    
 }
 
 void initialize_function_pointer(struct ssp_data *data)

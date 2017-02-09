@@ -1,7 +1,7 @@
 /*
  * Linux cfgp2p driver
  *
- * Copyright (C) 1999-2015, Broadcom Corporation
+ * Copyright (C) 1999-2016, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfgp2p.h 602251 2015-11-25 11:28:15Z $
+ * $Id: wl_cfgp2p.h 608210 2015-12-24 05:34:04Z $
  */
 #ifndef _wl_cfgp2p_h_
 #define _wl_cfgp2p_h_
@@ -96,7 +96,7 @@ struct p2p_info {
 	wlc_ssid_t ssid;
 };
 
-#define MAX_VNDR_IE_NUMBER	7
+#define MAX_VNDR_IE_NUMBER	10
 
 struct parsed_vndr_ie_info {
 	char *ie_ptr;

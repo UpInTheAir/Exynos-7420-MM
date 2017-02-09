@@ -611,7 +611,8 @@ int parse_dataframe(struct ssp_data *data, char *dataframe, int frame_len)
 					report_sensordata(data, sensor, &sensorsdata);
 				else if ((sensor == PROXIMITY_SENSOR) || (sensor == PROXIMITY_RAW)
 						|| (sensor == STEP_COUNTER)   || (sensor == STEP_DETECTOR)
-						|| (sensor == GESTURE_SENSOR) || (sensor == SIG_MOTION_SENSOR))
+						|| (sensor == GESTURE_SENSOR) || (sensor == SIG_MOTION_SENSOR)
+						|| (sensor == TILT_DETECTOR) || (sensor == PICKUP_GESTURE))
 					report_sensordata(data, sensor, &sensorsdata);
 				else
 					ssp_errf("irq_diff is under 1msec (%d)", sensor);

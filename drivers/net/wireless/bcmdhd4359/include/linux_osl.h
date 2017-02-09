@@ -261,8 +261,7 @@ extern int osl_error(int bcmerror);
 
 /* register access macros */
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 1)) && defined(CONFIG_64BIT) && \
-	defined(CONFIG_X86)
+#ifdef CONFIG_64BIT
 #define R_REG(osh, r) (\
 	SELECT_BUS_READ(osh, \
 		({ \
@@ -285,7 +284,7 @@ extern int osl_error(int bcmerror);
 #define R_REG(osh, r) (\
 	SELECT_BUS_READ(osh, \
 		({ \
-			__typeof(*(r)) __osl_v; \
+ 			__typeof(*(r)) __osl_v = 0; \
 			switch (sizeof(*(r))) { \
 				case sizeof(uint8):	__osl_v = \
 					readb((volatile uint8*)(r)); break; \
@@ -298,9 +297,8 @@ extern int osl_error(int bcmerror);
 		}), \
 		OSL_READ_REG(osh, r)) \
 )
-#endif /* KERNEL_VERSION(3, 11, 1)) && defined(CONFIG_64BIT) && defined(CONFIG_X86) */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 1)) && defined(CONFIG_64BIT) && \
-	defined(CONFIG_X86)
+#endif /* defined(CONFIG_64BIT) */
+#ifdef CONFIG_64BIT
 #define W_REG(osh, r, v) do { \
 	SELECT_BUS_WRITE(osh, \
 		switch (sizeof(*(r))) { \
@@ -321,7 +319,7 @@ extern int osl_error(int bcmerror);
 		}, \
 		(OSL_WRITE_REG(osh, r, v))); \
 	} while (0)
-#endif  /* KERNEL_VERSION(3, 11, 1)) && defined(CONFIG_64BIT) && defined(CONFIG_X86) */
+#endif  /* defined(CONFIG_64BIT) */
 
 #define	AND_REG(osh, r, v)		W_REG(osh, (r), R_REG(osh, r) & (v))
 #define	OR_REG(osh, r, v)		W_REG(osh, (r), R_REG(osh, r) | (v))

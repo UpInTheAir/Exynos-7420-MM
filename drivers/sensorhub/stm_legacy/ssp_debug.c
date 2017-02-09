@@ -21,7 +21,7 @@ int debug_crash_dump(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 {
 	struct timeval cur_time;
 	char strFilePath[100];
-	int iRetWrite = 0, iRet = 0;
+	int iRetWrite = 0;
 	unsigned char datacount = pchRcvDataFrame[1];
 	unsigned int databodysize = iLength - 2;
 	char *databody = &pchRcvDataFrame[2];
@@ -53,9 +53,8 @@ int debug_crash_dump(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 			ssp_err("save_crash_dump : open file(%s)", strFilePath);
 
 			if (IS_ERR(data->realtime_dump_file)) {
-				ssp_errf("Can't open dump file");
+				ssp_errf("Can't open dump file(%ld)", PTR_ERR(data->realtime_dump_file));
 				set_fs(backup_fs);
-				iRet = PTR_ERR(data->realtime_dump_file);
 				filp_close(data->realtime_dump_file,
 					current->files);
 				data->realtime_dump_file = NULL;
@@ -107,7 +106,7 @@ void ssp_dump_task(struct work_struct *work)
 	struct timeval cur_time;
 	mm_segment_t fs;
 	int buf_len, packet_len, residue;
-	int iRet = 0, index = 0, iRetTrans = 0, iRetWrite = 0;
+	int index = 0, iRetTrans = 0, iRetWrite = 0;
 
 	big = container_of(work, struct ssp_big, work);
 	ssp_errf("start ssp dumping (%d)(%d)",
@@ -134,9 +133,8 @@ void ssp_dump_task(struct work_struct *work)
 #endif
 
 		if (IS_ERR(dump_file)) {
-			ssp_errf("Can't open dump file");
+			ssp_errf("Can't open dump file(%ld)", PTR_ERR(dump_file));
 			set_fs(fs);
-			iRet = PTR_ERR(dump_file);
 			wake_unlock(&big->data->ssp_wake_lock);
 			kfree(big);
 			return;
@@ -293,97 +291,123 @@ static void print_sensordata(struct ssp_data *data, unsigned int uSensor)
 	switch (uSensor) {
 	case ACCELEROMETER_SENSOR:
 	case GYROSCOPE_SENSOR:
-		ssp_info("%u : %d, %d, %d (%ums, %dms)", uSensor,
+		ssp_info("%u : %d, %d, %d (%ums, %dms) - %llu", uSensor,
 			data->buf[uSensor].x, data->buf[uSensor].y,
 			data->buf[uSensor].z,
 			get_msdelay(data->adDelayBuf[uSensor]),
-			data->batchLatencyBuf[uSensor]);
+			data->batchLatencyBuf[uSensor],
+			data->lastTimestamp[uSensor]);
 		break;
 	case GEOMAGNETIC_SENSOR:
-		ssp_info("%u : %d, %d, %d, %d (%ums)", uSensor,
+		ssp_info("%u : %d, %d, %d, %d (%ums) - %llu", uSensor,
 			data->buf[uSensor].cal_x, data->buf[uSensor].cal_y,
 			data->buf[uSensor].cal_y, data->buf[uSensor].accuracy,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case GEOMAGNETIC_UNCALIB_SENSOR:
-		ssp_info("%u : %d, %d, %d, %d, %d, %d (%ums)", uSensor,
+		ssp_info("%u : %d, %d, %d, %d, %d, %d (%ums) - %llu", uSensor,
 			data->buf[uSensor].uncal_x, data->buf[uSensor].uncal_y,
 			data->buf[uSensor].uncal_z, data->buf[uSensor].offset_x,
 			data->buf[uSensor].offset_y, data->buf[uSensor].offset_z,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case PRESSURE_SENSOR:
-		ssp_info("%u : %d, %d (%ums, %dms)", uSensor,
+		ssp_info("%u : %d, %d (%ums, %dms) - %llu", uSensor,
 			data->buf[uSensor].pressure,
 			data->buf[uSensor].temperature,
 			get_msdelay(data->adDelayBuf[uSensor]),
-			data->batchLatencyBuf[uSensor]);
+			data->batchLatencyBuf[uSensor],
+			data->lastTimestamp[uSensor]);
 		break;
 	case GESTURE_SENSOR:
-		ssp_info("%u : %d, %d, %d, %d (%ums)", uSensor,
+		ssp_info("%u : %d, %d, %d, %d (%ums) - %llu", uSensor,
 			data->buf[uSensor].data[3], data->buf[uSensor].data[4],
 			data->buf[uSensor].data[5], data->buf[uSensor].data[6],
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case LIGHT_SENSOR:
-		ssp_info("%u : %u, %u, %u, %u, %u, %u (%ums)", uSensor,
+		ssp_info("%u : %u, %u, %u, %u, %u, %u (%ums) - %llu", uSensor,
 			data->buf[uSensor].r, data->buf[uSensor].g,
 			data->buf[uSensor].b, data->buf[uSensor].w,
 			data->buf[uSensor].a_time, data->buf[uSensor].a_gain,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case PROXIMITY_SENSOR:
-		ssp_info("%u : %d, %d (%ums)", uSensor,
+		ssp_info("%u : %d, %d (%ums) - %llu", uSensor,
 			data->buf[uSensor].prox, data->buf[uSensor].prox_ex,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case STEP_DETECTOR:
-		ssp_info("%u : %u (%ums, %dms)", uSensor,
+		ssp_info("%u : %u (%ums, %dms) - %llu", uSensor,
 			data->buf[uSensor].step_det,
 			get_msdelay(data->adDelayBuf[uSensor]),
-			data->batchLatencyBuf[uSensor]);
+			data->batchLatencyBuf[uSensor],
+			data->lastTimestamp[uSensor]);
 		break;
 	case GAME_ROTATION_VECTOR:
 	case ROTATION_VECTOR:
-		ssp_info("%u : %d, %d, %d, %d, %d (%ums, %dms)", uSensor,
+		ssp_info("%u : %d, %d, %d, %d, %d (%ums, %dms) - %llu", uSensor,
 			data->buf[uSensor].quat_a, data->buf[uSensor].quat_b,
 			data->buf[uSensor].quat_c, data->buf[uSensor].quat_d,
 			data->buf[uSensor].acc_rot,
 			get_msdelay(data->adDelayBuf[uSensor]),
-			data->batchLatencyBuf[uSensor]);
+			data->batchLatencyBuf[uSensor],
+			data->lastTimestamp[uSensor]);
 		break;
 	case SIG_MOTION_SENSOR:
-		ssp_info("%u : %u(%ums)", uSensor,
+		ssp_info("%u : %u(%ums) - %llu", uSensor,
 			data->buf[uSensor].sig_motion,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case GYRO_UNCALIB_SENSOR:
-		ssp_info("%u : %d, %d, %d, %d, %d, %d (%ums)", uSensor,
+		ssp_info("%u : %d, %d, %d, %d, %d, %d (%ums) - %llu", uSensor,
 			data->buf[uSensor].uncal_x, data->buf[uSensor].uncal_y,
 			data->buf[uSensor].uncal_z, data->buf[uSensor].offset_x,
 			data->buf[uSensor].offset_y,
 			data->buf[uSensor].offset_z,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case STEP_COUNTER:
-		ssp_info("%u : %u(%ums)", uSensor,
+		ssp_info("%u : %u(%ums) - %llu", uSensor,
 			data->buf[uSensor].step_diff,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case LIGHT_IR_SENSOR:
-		ssp_info("%u : %u, %u, %u, %u, %u, %u, %u(%ums)", uSensor,
+		ssp_info("%u : %u, %u, %u, %u, %u, %u, %u(%ums) - %llu", uSensor,
 			data->buf[uSensor].irdata,
 			data->buf[uSensor].ir_r, data->buf[uSensor].ir_g,
 			data->buf[uSensor].ir_b, data->buf[uSensor].ir_w,
 			data->buf[uSensor].ir_a_time,
 			data->buf[uSensor].ir_a_gain,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case INTERRUPT_GYRO_SENSOR:
-		ssp_info("%u : %d, %d, %d (%ums)", uSensor,
+		ssp_info("%u : %d, %d, %d (%ums) - %llu", uSensor,
 			data->buf[uSensor].x, data->buf[uSensor].y,
 			data->buf[uSensor].z,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
+		break;
+	case TILT_DETECTOR:
+		ssp_info("%u : %u(%ums) - %llu", uSensor,
+			data->buf[uSensor].tilt_detector,
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
+		break;
+	case PICKUP_GESTURE:
+		ssp_info("%u : %u(%ums) - %llu", uSensor,
+			data->buf[uSensor].pickup_gesture,
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	default:
 		ssp_info("Wrong sensorCnt: %u", uSensor);

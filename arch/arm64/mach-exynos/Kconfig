@@ -34,6 +34,7 @@ config SOC_EXYNOS7420
 	select SAMSUNG_DMADEV
 	select CAL_SYS_PWRDOWN
 	select EXYNOS_SPI_RESET_DURING_DSTOP if CPU_IDLE
+	select SOC_SAMSUNG
 	help
 	  Enable EXYNOS7420 SoC support
 
@@ -85,7 +86,6 @@ config EXYNOS_ATAGS
 
 config EXYNOS5_DYNAMIC_CPU_HOTPLUG
 	bool "Dynamic CPU Hotplug support"
-	depends on !SOC_EXYNOS7580
 	depends on CPU_FREQ
 	help
 		Enable Dynamic CPU Hotplug
@@ -99,13 +99,6 @@ config EXYNOS5_DYNAMIC_CPU_HOTPLUG_SLEEP_PREPARE
           during sleep/wakeup sequence.
           This config set the number of activate cores.
           defaut value is "4" to activate all cores in cluster0.
-
-config EXYNOS7580_DYNAMIC_CLUSTER_HOTPLUG
-	bool "Dynamic CLUSTER Hotplug support"
-	depends on SOC_EXYNOS7580
-	depends on CPU_FREQ
-	help
-		Enable Dynamic CLUSTER Hotplug
 
 config EXYNOS_CONTENT_PATH_PROTECTION
 	bool "Exynos Content Path Protection"
@@ -244,6 +237,7 @@ config MACH_UNIVERSAL7420
 	help
 	  Machine support for Samsung EXYNOS7420 machine with device tree enabled.
 	  Select this if a fdt blob is available for the EXYNOS7420 SoC based board.
+
 endmenu
 
 # Reset IPs during LPA/DSTOP

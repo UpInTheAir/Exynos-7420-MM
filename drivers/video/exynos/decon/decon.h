@@ -407,10 +407,19 @@ struct decon_win_config {
 			/* no read area of IDMA */
 			struct decon_win_rect		block_area;
 			struct decon_win_rect           transparent_area;
-			struct decon_win_rect           opaque_area;			
+			struct decon_win_rect           opaque_area;
 			/* source framebuffer coordinates */
 			struct decon_frame		src;
 		};
+#ifdef CONFIG_FB_DSU
+		struct {
+			int left;
+			int top;
+			int right;
+			int bottom;
+			int enableDSU;
+		};
+#endif
 	};
 
 	/* destination OSD coordinates */
@@ -472,6 +481,15 @@ union decon_ioctl_data {
 	struct decon_win_config_data win_data;
 	u32 vsync;
 };
+
+#ifdef CONFIG_LCD_DOZE_MODE
+enum decon_doze_mode {
+	DECON_DOZE_STATE_NORMAL = 0,
+	DECON_DOZE_STATE_DOZE,
+	DECON_DOZE_STATE_SUSPEND,
+	DECON_DOZE_STATE_DOZE_SUSPEND
+};
+#endif
 
 struct decon_underrun_stat {
 	int	prev_bw;
@@ -687,6 +705,24 @@ void DISP_SS_EVENT_SIZE_ERR_LOG(struct v4l2_subdev *sd, struct disp_ss_size_info
 
 #define MAX_VPP_LOG	10
 
+#ifdef CONFIG_FB_DSU
+enum decon_dsu_state {
+	DECON_DSU_DONE = 0,
+	DECON_DSU_IGNORE_VSYNC,
+	DECON_DSU_MIC_CMD,
+	DECON_DSU_TE_ON,
+	DECON_DSU_DISPLAY_ON,
+	DECON_DSU_UPDATE_RECT,
+};
+
+enum decon_dsu_mode {
+	DECON_DSU_RES_WQHD = 4,
+	DECON_DSU_RES_FHD = 5,
+	DECON_DSU_RES_HD = 6,
+	DECON_DSU_RES_DEFAULT = 4,
+};
+#endif
+
 struct vpp_drm_log {
 	unsigned long long time;
 	int decon_id;
@@ -796,12 +832,35 @@ struct decon_device {
 	struct mdnie_info *mdnie;
 	struct decon_win_config_data winconfig;
 #endif
+#ifdef CONFIG_LCD_DOZE_MODE
+	unsigned int decon_doze;
+	bool vsync_backup;
+	unsigned int req_display_on;
+#endif
 	unsigned int			force_fullupdate;
 	bool				dma_block_disable;
 	bool				win_update_disable;
 	bool				lpd_disable;
 	bool				sblock_disable;
 	bool				sdma_map_disable;
+
+	dma_addr_t vgr0_cb_addr;
+	dma_addr_t vgr1_cb_addr;
+
+	bool int_fifo_status;
+
+#ifdef CONFIG_FB_DSU
+	int need_DSU_update;
+	enum decon_dsu_mode	DSU_mode;
+	bool	is_DSU_mic;
+	bool	is_DSU_dsc;
+	int 	DSU_x_delta;
+	int 	DSU_y_delta;
+	struct decon_win_rect DSU_rect;
+	struct decon_lcd lcd_info_default;
+	s64 dsu_lock_cnt;
+	struct mutex	dsu_lock;
+#endif
 
 	int	systrace_pid;
 	void	(*tracing_mark_write)( int pid, char id, char* str1, int value );
@@ -869,6 +928,8 @@ int decon_disable(struct decon_device *decon);
 int decon_tui_protection(struct decon_device *decon, bool tui_en);
 int decon_wait_for_vsync(struct decon_device *decon, u32 timeout);
 
+
+void vpp_dump(struct decon_device *decon);
 /* internal only function API */
 int decon_fb_config_eint_for_te(struct platform_device *pdev, struct decon_device *decon);
 int decon_int_create_vsync_thread(struct decon_device *decon);
@@ -942,7 +1003,7 @@ static inline bool is_cam_not_running(struct decon_device *decon)
 }
 static inline bool decon_lpd_enter_cond(struct decon_device *decon)
 {
-#if defined(CONFIG_LCD_ALPM) || defined(CONFIG_LCD_HMT)
+#if defined(CONFIG_LCD_ALPM) || defined(CONFIG_LCD_HMT) || defined(CONFIG_LCD_DOZE_MODE)
 	struct dsim_device *dsim = NULL;
 	dsim = container_of(decon->output_sd, struct dsim_device, sd);
 #endif
@@ -954,7 +1015,10 @@ static inline bool decon_lpd_enter_cond(struct decon_device *decon)
 	&& (!dsim->priv.hmt_on)
 #endif
 #if defined(CONFIG_EXYNOS_DECON_MDNIE)
-	&& (decon->mdnie->auto_brightness < 6)
+	&& (!decon->mdnie->hbm)
+#endif
+#ifdef CONFIG_LCD_DOZE_MODE
+	&& (!dsim->dsim_doze)
 #endif
 		&& (atomic_inc_return(&decon->lpd_trig_cnt) >= DECON_ENTER_LPD_CNT));
 
@@ -991,5 +1055,14 @@ static inline bool is_any_pending_frames(struct decon_device *decon)
 
 #define DECON_IOC_LPD_EXIT_LOCK		_IOW('L', 0, u32)
 #define DECON_IOC_LPD_UNLOCK		_IOW('L', 1, u32)
+#ifdef CONFIG_LCD_DOZE_MODE
+#define S3CFB_POWER_MODE		_IOW('F', 223, __u32)
+enum disp_pwr_mode {
+	DECON_POWER_MODE_OFF = 0,
+	DECON_POWER_MODE_DOZE,
+	DECON_POWER_MODE_NORMAL,
+	DECON_POWER_MODE_DOZE_SUSPEND,
+};
+#endif
 
 #endif /* ___SAMSUNG_DECON_H__ */

@@ -298,6 +298,7 @@ static int idletimer_tg_create(struct idletimer_tg_info *info)
 	info->timer->delayed_timer_trigger.tv_nsec = 0;
 	info->timer->work_pending = false;
 	get_monotonic_boottime(&info->timer->last_modified_timer);
+	get_monotonic_boottime(&info->timer->last_suspend_time);
 
 	info->timer->pm_nb.notifier_call = idletimer_resume;
 	ret = register_pm_notifier(&info->timer->pm_nb);

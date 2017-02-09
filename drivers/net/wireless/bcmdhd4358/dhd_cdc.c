@@ -1,7 +1,7 @@
 /*
  * DHD Protocol Module for CDC and BDC.
  *
- * Copyright (C) 1999-2015, Broadcom Corporation
+ * Copyright (C) 1999-2016, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -312,7 +312,6 @@ dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int len)
 
 	if ((dhd->busstate == DHD_BUS_DOWN) || dhd->hang_was_sent) {
 		DHD_ERROR(("%s : bus is down. we have nothing to do\n", __FUNCTION__));
-        DHD_ERROR(("%s : busstate (%d), hang_was_sent(%d)\n", __FUNCTION__, dhd->busstate, dhd->hang_was_sent));
 		goto done;
 	}
 

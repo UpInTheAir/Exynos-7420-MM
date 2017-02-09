@@ -918,7 +918,7 @@ static inline bool decon_lpd_enter_cond(struct decon_device *decon)
 	&& (!dsim->priv.hmt_on)
 #endif
 #if defined(CONFIG_EXYNOS_DECON_MDNIE)
-	&& (decon->mdnie->auto_brightness < 6)
+	&& (!decon->mdnie->hbm)
 #endif
 		&& (atomic_inc_return(&decon->lpd_trig_cnt) >= DECON_ENTER_LPD_CNT));
 

@@ -1,7 +1,7 @@
 /*
  * DHD PROP_TXSTATUS Module.
  *
- * Copyright (C) 1999-2015, Broadcom Corporation
+ * Copyright (C) 1999-2016, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_wlfc.c 496585 2014-08-13 16:37:50Z $
+ * $Id: dhd_wlfc.c 655338 2016-08-19 03:50:52Z $
  *
  */
 
@@ -94,7 +94,7 @@ _dhd_wlfc_prec_enque(struct pktq *pq, int prec, void* p, bool qHead,
 
 
 	ASSERT(prec >= 0 && prec < pq->num_prec);
-	ASSERT(PKTLINK(p) == NULL);         /* queueing chains not allowed */
+	ASSERT(PKTLINK(p) == NULL);		/* queueing chains not allowed */
 
 	ASSERT(!pktq_full(pq));
 	ASSERT(!pktq_pfull(pq, prec));

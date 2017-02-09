@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_common.c 610555 2016-01-07 07:41:14Z $
+ * $Id: dhd_common.c 666684 2016-10-24 08:47:59Z $
  */
 #include <typedefs.h>
 #include <osl.h>
@@ -121,9 +121,7 @@ const char dhd_version[] = "Dongle Host Driver, version " EPI_VERSION_STR
 #else
 const char dhd_version[] = "\nDongle Host Driver, version " EPI_VERSION_STR "\nCompiled from ";
 #endif 
-#ifdef DHD_LOG_DUMP
 char fw_version[FW_VER_STR_LEN] = "\0";
-#endif /* DHD_LOG_DUMP */
 
 void dhd_set_timer(void *bus, uint wdtick);
 
@@ -314,6 +312,7 @@ dhd_dump_to_kernelog(dhd_pub_t *dhdp)
 {
 	char buf[512];
 
+	DHD_ERROR(("F/W version: %s\n", fw_version));
 	bcm_bprintf_bypass = TRUE;
 	dhd_dump(dhdp, buf, sizeof(buf));
 	bcm_bprintf_bypass = FALSE;
@@ -333,6 +332,53 @@ dhd_wl_ioctl_cmd(dhd_pub_t *dhd_pub, int cmd, void *arg, int len, uint8 set, int
 }
 
 int
+dhd_wl_ioctl_get_intiovar(dhd_pub_t *dhd_pub, char *name, uint *pval,
+	int cmd, uint8 set, int ifidx)
+{
+	char iovbuf[WLC_IOCTL_SMLEN];
+	int ret = -1;
+
+	/* memset(iovbuf, 0, sizeof(iovbuf)); */
+	if (bcm_mkiovar(name, NULL, 0, iovbuf, sizeof(iovbuf))) {
+		ret = dhd_wl_ioctl_cmd(dhd_pub, cmd, iovbuf, sizeof(iovbuf), set, ifidx);
+		if (!ret) {
+			*pval = ltoh32(*((uint*)iovbuf));
+		} else {
+			DHD_ERROR(("%s: get int iovar %s failed, ERR %d\n",
+				__FUNCTION__, name, ret));
+		}
+	} else {
+		DHD_ERROR(("%s: mkiovar %s failed\n",
+			__FUNCTION__, name));
+	}
+
+	return ret;
+}
+
+int
+dhd_wl_ioctl_set_intiovar(dhd_pub_t *dhd_pub, char *name, uint val,
+	int cmd, uint8 set, int ifidx)
+{
+	char iovbuf[WLC_IOCTL_SMLEN];
+	int ret = -1;
+	int lval = htol32(val);
+
+	/* memset(iovbuf, 0, sizeof(iovbuf)); */
+	if (bcm_mkiovar(name, (char*)&lval, sizeof(lval), iovbuf, sizeof(iovbuf))) {
+		ret = dhd_wl_ioctl_cmd(dhd_pub, cmd, iovbuf, sizeof(iovbuf), set, ifidx);
+		if (ret) {
+			DHD_ERROR(("%s: set int iovar %s failed, ERR %d\n",
+				__FUNCTION__, name, ret));
+		}
+	} else {
+		DHD_ERROR(("%s: mkiovar %s failed\n",
+			__FUNCTION__, name));
+	}
+
+	return ret;
+}
+
+int
 dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifidx, wl_ioctl_t *ioc, void *buf, int len)
 {
 	int ret = BCME_ERROR;
@@ -340,8 +386,7 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifidx, wl_ioctl_t *ioc, void *buf, int len)
 	if (dhd_os_proto_block(dhd_pub))
 	{
 #ifdef DHD_LOG_DUMP
-		int slen, i, val, rem;
-		long int lval;
+		int slen, i, val, rem, lval;
 		char *pval, *pos, *msg;
 		char tmp[64];
 
@@ -373,12 +418,12 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifidx, wl_ioctl_t *ioc, void *buf, int len)
 			slen = strlen(ioc->buf) + 1;
 			msg = (char*)ioc->buf;
 			if (ioc->cmd == WLC_GET_VAR) {
-				bcopy(msg, &lval, sizeof(long int));
 				msg = tmp;
 			} else {
-				bcopy((msg + slen), &lval, sizeof(long int));
+				int min_len = MIN(ioc->len - slen, sizeof(int));
+				bcopy((msg + slen), &lval, min_len);
 			}
-			DHD_ERROR_EX(("%s: cmd: %d, msg: %s, val: 0x%lx, len: %d, set: %d\n",
+			DHD_ERROR_EX(("%s: cmd: %d, msg: %s, val: 0x%x, len: %d, set: %d\n",
 				ioc->cmd == WLC_GET_VAR ? "WLC_GET_VAR" : "WLC_SET_VAR",
 				ioc->cmd, msg, lval, ioc->len, ioc->set));
 		} else {
@@ -1578,55 +1623,69 @@ wl_show_host_event(dhd_pub_t *dhd_pub, wl_event_msg_t *event, void *event_data,
 }
 #endif /* SHOW_EVENTS */
 
+/* Check whether packet is a BRCM event pkt. If it is, record event data. */
 int
-wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, size_t pktlen,
+wl_host_event_get_data(void *pktdata, uint pktlen, bcm_event_msg_u_t *evu)
+{
+	int ret;
+
+	ret = is_wlc_event_frame(pktdata, pktlen, 0, evu);
+	if (ret != BCME_OK) {
+		DHD_ERROR(("%s: Invalid event frame, err = %d\n",
+			__FUNCTION__, ret));
+	}
+
+	return ret;
+}
+
+int
+wl_process_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen,
 	wl_event_msg_t *event, void **data_ptr, void *raw_event)
 {
-	/* check whether packet is a BRCM event pkt */
 	bcm_event_t *pvt_data = (bcm_event_t *)pktdata;
+	bcm_event_msg_u_t evu;
 	uint8 *event_data;
 	uint32 type, status, datalen;
 	uint16 flags;
 	uint evlen;
+	int ret;
 	int hostidx;
+	uint16 usr_subtype;
 
-	if (bcmp(BRCM_OUI, &pvt_data->bcm_hdr.oui[0], DOT11_OUI_LEN)) {
-		DHD_ERROR(("%s: mismatched OUI, bailing\n", __FUNCTION__));
-		return (BCME_ERROR);
+	ret = wl_host_event_get_data(pktdata, pktlen, &evu);
+	if (ret != BCME_OK) {
+		return ret;
 	}
 
-	if (ntoh16_ua((void *)&pvt_data->bcm_hdr.subtype) != BCMILCP_SUBTYPE_VENDOR_LONG ||
-		(bcmp(BRCM_OUI, &pvt_data->bcm_hdr.oui[0], DOT11_OUI_LEN)) ||
-		ntoh16_ua((void *)&pvt_data->bcm_hdr.usr_subtype) != BCMILCP_BCM_SUBTYPE_EVENT)
-	{
-		DHD_ERROR(("%s: mismatched bcm_event_t info, bailing out\n", __FUNCTION__));
-		return (BCME_ERROR);
+	usr_subtype = ntoh16_ua((void *)&pvt_data->bcm_hdr.usr_subtype);
+	switch (usr_subtype) {
+	case BCMILCP_BCM_SUBTYPE_EVENT:
+		memcpy(event, &evu.event, sizeof(wl_event_msg_t));
+		*data_ptr = &pvt_data[1];
+		break;
+	case BCMILCP_BCM_SUBTYPE_DNGLEVENT:
+#ifdef DNGL_EVENT_SUPPORT
+		/* If it is a DNGL event process it first */
+		if (dngl_host_event(dhd_pub, pktdata, &evu.dngl_event, pktlen) == BCME_OK) {
+			/*
+			 * Return error purposely to prevent DNGL event being processed
+			 * as BRCM event
+			 */
+			return BCME_ERROR;
+		}
+#endif /* DNGL_EVENT_SUPPORT */
+		return BCME_NOTFOUND;
+	default:
+		return BCME_NOTFOUND;
 	}
 
-	if (pktlen < sizeof(bcm_event_t))
-		return (BCME_ERROR);
-
-	*data_ptr = &pvt_data[1];
+	/* start wl_event_msg process */
 	event_data = *data_ptr;
-
-
-	/* memcpy since BRCM event pkt may be unaligned. */
-	memcpy(event, &pvt_data->event, sizeof(wl_event_msg_t));
-
 	type = ntoh32_ua((void *)&event->event_type);
 	flags = ntoh16_ua((void *)&event->flags);
 	status = ntoh32_ua((void *)&event->status);
 	datalen = ntoh32_ua((void *)&event->datalen);
 	evlen = datalen + sizeof(bcm_event_t);
-
-	if (datalen > pktlen) {
-		return (BCME_ERROR);
-	}
-
-	evlen = datalen + sizeof(bcm_event_t);
-	if (evlen > pktlen) {
-		return (BCME_ERROR);
-	}
 
 	/* find equivalent host index for event ifidx */
 	hostidx = dhd_ifidx2hostidx(dhd_pub->info, event->ifidx);
@@ -1699,6 +1758,11 @@ wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, size_t pktlen,
 			} else if (ifevent->opcode == WLC_E_IF_DEL) {
 				dhd_event_ifdel(dhd_pub->info, ifevent, event->ifname,
 					event->addr.octet);
+				/* Return ifidx (for vitual i/f, it will be > 0)
+				 * so that no other operations on deleted interface
+				 * are carried out
+				 */
+				return ifevent->ifidx;
 			} else if (ifevent->opcode == WLC_E_IF_CHANGE) {
 #ifdef WL_CFG80211
 				wl_cfg80211_notify_ifchange(ifevent->ifidx,
@@ -1706,10 +1770,10 @@ wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, size_t pktlen,
 #endif /* WL_CFG80211 */
 			}
 		} else {
-#if !defined(PROP_TXSTATUS) || !defined(PCIE_FULL_DONGLE)
+#if !defined(PROP_TXSTATUS) && !defined(PCIE_FULL_DONGLE) && defined(WL_CFG80211)
 			DHD_ERROR(("%s: Invalid ifidx %d for %s\n",
 			           __FUNCTION__, ifevent->ifidx, event->ifname));
-#endif /* !PROP_TXSTATUS */
+#endif /* !PROP_TXSTATUS && !PCIE_FULL_DONGLE && WL_CFG80211 */
 		}
 			/* send up the if event: btamp user needs it */
 			*ifidx = hostidx;
@@ -1718,19 +1782,14 @@ wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, size_t pktlen,
 		break;
 	}
 
-	case WLC_E_NDIS_LINK: {
-		uint32 temp = hton32(WLC_E_LINK);
-
-		memcpy((void *)(&pvt_data->event.event_type), &temp,
-		       sizeof(pvt_data->event.event_type));
+	case WLC_E_NDIS_LINK:
 		break;
-	}
 	case WLC_E_PFN_NET_FOUND:
+	case WLC_E_PFN_SCAN_ALLGONE: /* share with WLC_E_PFN_BSSID_NET_LOST */
 	case WLC_E_PFN_NET_LOST:
 		break;
 #if defined(PNO_SUPPORT)
 	case WLC_E_PFN_BSSID_NET_FOUND:
-	case WLC_E_PFN_BSSID_NET_LOST:
 	case WLC_E_PFN_BEST_BATCHING:
 		dhd_pno_event_handler(dhd_pub, event, (void *)event_data);
 		break;
@@ -1796,6 +1855,14 @@ wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, size_t pktlen,
 #endif /* SHOW_EVENTS */
 
 	return (BCME_OK);
+}
+
+int
+wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, uint pktlen,
+	wl_event_msg_t *event, void **data_ptr, void *raw_event)
+{
+	return wl_process_host_event(dhd_pub, ifidx, pktdata, pktlen, event, data_ptr,
+			raw_event);
 }
 
 void
@@ -2609,9 +2676,7 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
 	int ret = -1;
 	int dtim_period = 0;
 	int ap_beacon = 0;
-#ifndef ENABLE_MAX_DTIM_IN_SUSPEND
 	int allowed_skip_dtim_cnt = 0;
-#endif /* !ENABLE_MAX_DTIM_IN_SUSPEND */
 	/* Check if associated */
 	if (dhd_is_associated(dhd, 0, NULL) == FALSE) {
 		DHD_TRACE(("%s NOT assoc ret %d\n", __FUNCTION__, ret));
@@ -2637,36 +2702,37 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
 		goto exit;
 	}
 
-#ifdef ENABLE_MAX_DTIM_IN_SUSPEND
-	bcn_li_dtim = (int) (MAX_DTIM_ALLOWED_INTERVAL / (ap_beacon * dtim_period));
-	if (bcn_li_dtim == 0) {
-		bcn_li_dtim = 1;
-	}
-#else /* ENABLE_MAX_DTIM_IN_SUSPEND */
+	if (dhd->max_dtim_enable) {
+		bcn_li_dtim = (int) (MAX_DTIM_ALLOWED_INTERVAL / (ap_beacon * dtim_period));
+		if (bcn_li_dtim == 0) {
+			bcn_li_dtim = 1;
+		}
+	} else {
+		/* attemp to use platform defined dtim skip interval */
+		bcn_li_dtim = dhd->suspend_bcn_li_dtim;
 
-	/* attemp to use platform defined dtim skip interval */
-	bcn_li_dtim = dhd->suspend_bcn_li_dtim;
+		/* check if sta listen interval fits into AP dtim */
+		if (dtim_period > CUSTOM_LISTEN_INTERVAL) {
+			/* AP DTIM to big for our Listen Interval : no dtim skiping */
+			bcn_li_dtim = NO_DTIM_SKIP;
+			DHD_ERROR(("%s DTIM=%d > Listen=%d : too big ...\n",
+				__FUNCTION__, dtim_period, CUSTOM_LISTEN_INTERVAL));
+			goto exit;
+		}
 
-	/* check if sta listen interval fits into AP dtim */
-	if (dtim_period > CUSTOM_LISTEN_INTERVAL) {
-		/* AP DTIM to big for our Listen Interval : no dtim skiping */
-		bcn_li_dtim = NO_DTIM_SKIP;
-		DHD_ERROR(("%s DTIM=%d > Listen=%d : too big ...\n",
-			__FUNCTION__, dtim_period, CUSTOM_LISTEN_INTERVAL));
-		goto exit;
-	}
+		if ((dtim_period * ap_beacon * bcn_li_dtim) > MAX_DTIM_ALLOWED_INTERVAL) {
+			allowed_skip_dtim_cnt =
+				MAX_DTIM_ALLOWED_INTERVAL / (dtim_period * ap_beacon);
+			bcn_li_dtim =
+				(allowed_skip_dtim_cnt != 0) ? allowed_skip_dtim_cnt : NO_DTIM_SKIP;
+		}
 
-	if ((dtim_period * ap_beacon * bcn_li_dtim) > MAX_DTIM_ALLOWED_INTERVAL) {
-		 allowed_skip_dtim_cnt = MAX_DTIM_ALLOWED_INTERVAL / (dtim_period * ap_beacon);
-		 bcn_li_dtim = (allowed_skip_dtim_cnt != 0) ? allowed_skip_dtim_cnt : NO_DTIM_SKIP;
+		if ((bcn_li_dtim * dtim_period) > CUSTOM_LISTEN_INTERVAL) {
+			/* Round up dtim_skip to fit into STAs Listen Interval */
+			bcn_li_dtim = (int)(CUSTOM_LISTEN_INTERVAL / dtim_period);
+			DHD_TRACE(("%s agjust dtim_skip as %d\n", __FUNCTION__, bcn_li_dtim));
+		}
 	}
-
-	if ((bcn_li_dtim * dtim_period) > CUSTOM_LISTEN_INTERVAL) {
-		/* Round up dtim_skip to fit into STAs Listen Interval */
-		bcn_li_dtim = (int)(CUSTOM_LISTEN_INTERVAL / dtim_period);
-		DHD_TRACE(("%s agjust dtim_skip as %d\n", __FUNCTION__, bcn_li_dtim));
-	}
-#endif /* ENABLE_MAX_DTIM_IN_SUSPEND */
 
 	DHD_ERROR(("%s beacon=%d bcn_li_dtim=%d DTIM=%d Listen=%d\n",
 		__FUNCTION__, ap_beacon, bcn_li_dtim, dtim_period, CUSTOM_LISTEN_INTERVAL));

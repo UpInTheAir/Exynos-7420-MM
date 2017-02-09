@@ -164,7 +164,7 @@ static int ghsic_data_alloc_requests(struct usb_ep *ep, struct list_head *head,
 	struct usb_request	*req;
 	unsigned long		flags;
 
-	pr_info("usb:(hsic) %s: ep:%s head:%p num:%d cb:%p", __func__,
+	pr_info("usb:(hsic) %s: ep:%s head:%pK num:%d cb:%pK", __func__,
 			ep->name, head, num, cb);
 
 	for (i = 0; i < num; i++) {
@@ -280,7 +280,7 @@ static int ghsic_data_receive(void *p, void *data, size_t len)
 		return -ENOTCONN;
 	}
 
-	pr_debug("usb:(hsic) %s: p:%p#%d skb_len:%d\n", __func__,
+	pr_debug("usb:(hsic) %s: p:%pK#%d skb_len:%d\n", __func__,
 			port, port->port_num, skb->len);
 
 	spin_lock_irqsave(&port->tx_lock, flags);
@@ -324,7 +324,7 @@ static void ghsic_data_write_tomdm(struct work_struct *w)
 	}
 
 	while ((skb = __skb_dequeue(&port->rx_skb_q))) {
-		pr_debug("usb:(hsic) %s: port:%p tom:%lu pno:%d\n", __func__,
+		pr_debug("usb:(hsic) %s: port:%pK tom:%lu pno:%d\n", __func__,
 				port, port->to_modem, port->port_num);
 
 		info = (struct timestamp_info *)skb->cb;
@@ -432,7 +432,7 @@ static void ghsic_data_start_rx(struct gdata_port *port)
 	struct timestamp_info	*info;
 	unsigned int		created;
 
-	pr_debug("usb:(hsic) %s: port:%p\n", __func__, port);
+	pr_debug("usb:(hsic) %s: port:%pK\n", __func__, port);
 	if (!port)
 		return;
 
@@ -489,7 +489,7 @@ static void ghsic_data_start_io(struct gdata_port *port)
 	struct usb_ep	*ep_out, *ep_in;
 	int		ret;
 
-	pr_info("usb:(hsic) %s: port:%p\n", __func__, port);
+	pr_info("usb:(hsic) %s: port:%pK\n", __func__, port);
 
 	if (!port)
 		return;
@@ -554,7 +554,7 @@ static void ghsic_data_connect_w(struct work_struct *w)
 		return;
 
 
-	pr_info("usb:(hsic) %s: port:%p, name=%s\n", __func__, port, port->brdg.name);
+	pr_info("usb:(hsic) %s: port:%pK, name=%s\n", __func__, port, port->brdg.name);
 
 	ret = data_bridge_open(&port->brdg);
 
@@ -769,7 +769,7 @@ static int ghsic_data_port_alloc(unsigned port_num, enum gadget_type gtype)
 
 	platform_driver_register(pdrv);
 
-	pr_info("usb:(hsic) %s: port:%p portno:%d\n", __func__, port, port_num);
+	pr_info("usb:(hsic) %s: port:%pK portno:%d\n", __func__, port, port_num);
 
 	return 0;
 }
@@ -866,14 +866,14 @@ int ghsic_data_connect(void *gptr, int port_num)
 
 	ret = usb_ep_enable(port->in);
 	if (ret) {
-		pr_info("usb:(hsic) %s: usb_ep_enable failed eptype:IN ep:%p",
+		pr_info("usb:(hsic) %s: usb_ep_enable failed eptype:IN ep:%pK",
 				__func__, port->in);
 		goto fail;
 	}
 	if (port->out) {
 		ret = usb_ep_enable(port->out);
 		if (ret) {
-			pr_err("%s: usb_ep_enable failed eptype:OUT ep:%p",
+			pr_err("%s: usb_ep_enable failed eptype:OUT ep:%pK",
 					__func__, port->out);
 			usb_ep_disable(port->in);
 			goto fail;
@@ -950,7 +950,7 @@ static void dbg_timestamp(char *event, struct sk_buff * skb)
 	write_lock_irqsave(&dbg_data.lck, flags);
 
 	scnprintf(dbg_data.buf[dbg_data.idx], DBG_DATA_MSG,
-		  "%p %u[%s] %u %u %u %u %u %u\n",
+		  "%pK %u[%s] %u %u %u %u %u %u\n",
 		  skb, skb->len, event, info->created, info->rx_queued,
 		  info->rx_done, info->rx_done_sent, info->tx_queued,
 		  get_timestamp());
@@ -1024,7 +1024,7 @@ static ssize_t ghsic_data_read_stats(struct file *file,
 		spin_lock_irqsave(&port->rx_lock, flags);
 		temp += scnprintf(buf + temp, DEBUG_DATA_BUF_SIZE - temp,
 				"\nName:           %s\n"
-				"#PORT:%d port#:   %p\n"
+				"#PORT:%d port#:   %pK\n"
 				"data_ch_open:	   %d\n"
 				"data_ch_ready:    %d\n"
 				"\n******UL INFO*****\n\n"

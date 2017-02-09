@@ -47,8 +47,9 @@ static int do_transfer(struct ssp_data *data, struct ssp_msg *msg,
 			goto exit;
 		}
 	}
-
-	status = spi_write(data->spi, msg, 9) >= 0;
+	
+	msg->timestamp =  get_current_timestamp();
+	status = spi_write(data->spi, msg, 9 + 8) >= 0;
 
 	if (status == 0) {
 		ssp_errf("spi_write fail!!");
@@ -139,6 +140,37 @@ int ssp_spi_sync(struct ssp_data *data, struct ssp_msg *msg, int timeout)
 	return status;
 }
 
+int ssp_spi_sync_with_timestamp(struct ssp_data *data, char* rx_buf, char* tx_buf, u16 chLength){
+	struct spi_message spi_msg;
+	struct spi_transfer xfer;
+	u64 current_time;
+	int iRet = 0;
+
+	if (rx_buf == NULL || tx_buf == NULL){
+		ssp_errf("failed to alloc memory for buffer!");
+		iRet = -ENOMEM;
+		goto fail_to_end;
+	}
+
+	current_time = get_current_timestamp();
+	if (chLength >= 8)
+		memcpy(tx_buf, &current_time, 8);
+
+	spi_message_init(&spi_msg);
+	memset(&xfer, 0, sizeof(xfer));
+	spi_message_add_tail(&xfer, &spi_msg);
+
+	xfer.len = chLength;
+	xfer.rx_buf = rx_buf;
+	xfer.tx_buf = tx_buf;
+
+	spi_msg.spi = data->spi;
+
+	iRet = spi_sync(spi_msg.spi, &spi_msg);
+fail_to_end:
+	return iRet;
+}
+
 int select_irq_msg(struct ssp_data *data)
 {
 	struct ssp_msg *msg, *n;
@@ -146,10 +178,11 @@ int select_irq_msg(struct ssp_data *data)
 	u16 chLength = 0, msg_options = 0;
 	u8 msg_type = 0;
 	int iRet = 0;
-	char *buffer;
+	char *rx_buf, *tx_buf;
 	char chTempBuf[4] = { -1 };
 
 	iRet = spi_read(data->spi, chTempBuf, sizeof(chTempBuf));
+	
 	if (iRet < 0) {
 		ssp_errf("spi_read fail, ret = %d", iRet);
 		return iRet;
@@ -185,7 +218,7 @@ int select_irq_msg(struct ssp_data *data)
 
 			if (msg_type == AP2HUB_READ)
 				iRet = spi_read(data->spi,
-						msg->buffer, msg->length);
+					msg->buffer, msg->length);
 			if (msg_type == AP2HUB_WRITE) {
 				iRet = spi_write(data->spi,
 						msg->buffer, msg->length);
@@ -212,22 +245,27 @@ exit:
 		mutex_unlock(&data->pending_mutex);
 		break;
 	case HUB2AP_WRITE:
-		buffer = kzalloc(chLength, GFP_KERNEL);
-		if (buffer == NULL) {
-			ssp_errf("failed to alloc memory for buffer");
-			iRet = -ENOMEM;
+		if(chLength == 0)
+		{
+			ssp_errf("chlength is zero");
+			iRet = -EINVAL;
 			break;
 		}
-		iRet = spi_read(data->spi, buffer, chLength);
+		rx_buf = (char *)kzalloc(chLength, GFP_KERNEL);
+		tx_buf = (char *)kzalloc(chLength, GFP_KERNEL);
+			
+		iRet = ssp_spi_sync_with_timestamp(data, rx_buf, tx_buf, chLength);
+			
 		if (iRet < 0)
 			ssp_errf("spi_read fail");
 		else {
-			//u64 ts = get_current_timestamp();
-			//pr_err("[SSP_IRQ] get event %lld\n",ts);
-			parse_dataframe(data, buffer, chLength);
+			parse_dataframe(data, rx_buf, chLength);
 		}
-
-		kfree(buffer);
+			
+		if (rx_buf != NULL)
+			kfree(rx_buf);
+		if (tx_buf != NULL)
+			kfree(tx_buf);
 		break;
 	default:
 		ssp_err("No type error(%d)", msg_type);
@@ -313,14 +351,15 @@ int send_instruction(struct ssp_data *data, u8 uInst,
 		ts = ktime_to_timespec(ktime_get_boottime());
 		timestamp = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
 		if (data->cameraGyroSyncMode && uSensorType == GYROSCOPE_SENSOR) {
-			data->lastTimestamp[uSensorType] = 0ULL;
+			data->lastTimestamp[uSensorType] = data->LastSensorTimeforReset[uSensorType] = 0ULL;
 		} else {
-			data->lastTimestamp[uSensorType] = timestamp + 5000000ULL;
+			data->lastTimestamp[uSensorType] = data->LastSensorTimeforReset[uSensorType] = timestamp + 5000000ULL;
 		}
 		data->bIsFirstData[uSensorType] = true;
 		break;
 	case CHANGE_DELAY:
 		command = MSG2SSP_INST_CHANGE_DELAY;
+		data->LastSensorTimeforReset[uSensorType] = timestamp;
 		break;
 	case GO_SLEEP:
 		command = MSG2SSP_AP_STATUS_SLEEP;
@@ -361,6 +400,17 @@ int send_instruction(struct ssp_data *data, u8 uInst,
 		ssp_errf("Instruction CMD Fail %d", iRet);
 		return ERROR;
 	}
+
+	if(uInst == ADD_SENSOR || uInst == CHANGE_DELAY)
+	{	
+		unsigned int BatchTimeforReset = 0;
+		if(uLength >= 9)
+			memcpy(&BatchTimeforReset, &uSendBuf[4], 4);
+		if(BatchTimeforReset == 0)
+			data->IsBypassMode[uSensorType] = 1;
+		else
+			data->IsBypassMode[uSensorType] = 0;
+	}	
 
 	return iRet;
 }
@@ -445,6 +495,17 @@ int send_instruction_sync(struct ssp_data *data, u8 uInst,
 		return ERROR;
 	}
 
+	if(uInst == ADD_SENSOR || uInst == CHANGE_DELAY)
+	{	
+		unsigned int BatchTimeforReset = 0;
+		if(uLength >= 9)
+			memcpy(&BatchTimeforReset, &uSendBuf[4], 4);
+		if(BatchTimeforReset == 0)
+			data->IsBypassMode[uSensorType] = 1;
+		else
+			data->IsBypassMode[uSensorType] = 0;
+	}	
+	
 	return buffer[0];
 }
 

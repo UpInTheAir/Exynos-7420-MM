@@ -926,14 +926,48 @@ static inline int arizona_dcvdd_notify(struct notifier_block *nb,
 #endif
 
 #ifdef CONFIG_PM_SLEEP
+static int arizona_suspend_noirq(struct device *dev)
+{
+	struct arizona *arizona = dev_get_drvdata(dev);
+
+	dev_dbg(arizona->dev, "Late suspend, reenabling IRQ\n");
+
+	if (arizona->irq_sem) {
+		enable_irq(arizona->irq);
+		arizona->irq_sem = 0;
+	}
+
+	return 0;
+}
+
+static int arizona_suspend(struct device *dev)
+{
+	struct arizona *arizona = dev_get_drvdata(dev);
+
+#ifdef CONFIG_MFD_ARIZONA_DEFERRED_RESUME
+	cancel_work_sync(&arizona->deferred_resume_work);
+#endif
+
+	dev_dbg(arizona->dev, "Early suspend, disabling IRQ\n");
+
+	if (!arizona->irq_sem) {
+		disable_irq(arizona->irq);
+		arizona->irq_sem = 1;
+	}
+
+	return 0;
+}
+
 static int arizona_resume_noirq(struct device *dev)
 {
 	struct arizona *arizona = dev_get_drvdata(dev);
 
 	dev_dbg(arizona->dev, "Early resume, disabling IRQ\n");
-	disable_irq(arizona->irq);
 
-	arizona->irq_sem = 1;
+	if (!arizona->irq_sem) {
+		disable_irq(arizona->irq);
+		arizona->irq_sem = 1;
+	}
 
 	return 0;
 }
@@ -992,8 +1026,9 @@ const struct dev_pm_ops arizona_pm_ops = {
 	SET_RUNTIME_PM_OPS(arizona_runtime_suspend,
 			   arizona_runtime_resume,
 			   NULL)
-	SET_SYSTEM_SLEEP_PM_OPS(NULL, arizona_resume)
+	SET_SYSTEM_SLEEP_PM_OPS(arizona_suspend, arizona_resume)
 #ifdef CONFIG_PM_SLEEP
+	.suspend_noirq = arizona_suspend_noirq,
 	.resume_noirq = arizona_resume_noirq,
 #endif
 };
