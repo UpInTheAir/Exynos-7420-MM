@@ -400,7 +400,7 @@ static ssize_t store_cpucore_min_num_limit(struct kobject *kobj,
 	return count;
 }
 
-static ssize_t store_cpucore_max_num_limit(struct kobject *kobj,
+static ssize_t __ref store_cpucore_max_num_limit(struct kobject *kobj,
 			struct attribute *attr, const char *buf, size_t count)
 {
 	int input, delta, cpu;
