@@ -345,30 +345,12 @@ static void save_tuners(struct cpufreq_policy *policy,
 
 static struct cs_dbs_tuners *alloc_tuners(struct cpufreq_policy *policy)
 {
-	u64 idle_time;
-	int cpu;
 	struct cs_dbs_tuners *tuners;
 
 	tuners = kzalloc(sizeof(struct cs_dbs_tuners), GFP_KERNEL);
 	if (!tuners) {
 		pr_err("%s: kzalloc failed\n", __func__);
 		return ERR_PTR(-ENOMEM);
-	}
-
-	cpu = get_cpu();
-	idle_time = get_cpu_idle_time_us(cpu, NULL);
-	put_cpu();
-	if (idle_time != -1ULL) {
-		/*
-		 * In nohz/micro accounting case we set the minimum frequency
-		 * not depending on HZ, but fixed (very low). The deferred
-		 * timer might skip some samples if idle/sleeping as needed.
-		*/
-		dbs_data->min_sampling_rate = MICRO_FREQUENCY_MIN_SAMPLE_RATE;
-	} else {
-		/* For correct statistics, we need 10 ticks for each measure */
-		dbs_data->min_sampling_rate =
-			MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(10);
 	}
 
 	tuners->up_threshold = DEF_FREQUENCY_UP_THRESHOLD;
@@ -396,6 +378,8 @@ static struct cs_dbs_tuners *restore_tuners(struct cpufreq_policy *policy)
 
 static int cs_init(struct dbs_data *dbs_data, struct cpufreq_policy *policy)
 {
+	u64 idle_time;
+	int cpu;
 	struct cs_dbs_tuners *tuners;
 
 	tuners = restore_tuners(policy);
@@ -403,6 +387,22 @@ static int cs_init(struct dbs_data *dbs_data, struct cpufreq_policy *policy)
 		tuners = alloc_tuners(policy);
 		if (IS_ERR(tuners))
 			return PTR_ERR(tuners);
+	}
+
+	cpu = get_cpu();
+	idle_time = get_cpu_idle_time_us(cpu, NULL);
+	put_cpu();
+	if (idle_time != -1ULL) {
+		/*
+		 * In nohz/micro accounting case we set the minimum frequency
+		 * not depending on HZ, but fixed (very low). The deferred
+		 * timer might skip some samples if idle/sleeping as needed.
+		*/
+		dbs_data->min_sampling_rate = MICRO_FREQUENCY_MIN_SAMPLE_RATE;
+	} else {
+		/* For correct statistics, we need 10 ticks for each measure */
+		dbs_data->min_sampling_rate =
+			MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(10);
 	}
 
 	dbs_data->tuners = tuners;
