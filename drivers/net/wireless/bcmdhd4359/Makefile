@@ -23,6 +23,10 @@
 # <<Broadcom-WL-IPTag/Open:>>
 #
 # bcmdhd
+
+# Suppress warnings for GCC 6.0
+CFLAGS_siutils.o := $(KBUILD_CFLAGS) -Wno-tautological-compare
+
 #####################
 # Basic feature
 #####################
