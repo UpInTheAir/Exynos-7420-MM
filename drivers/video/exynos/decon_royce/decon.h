@@ -793,7 +793,8 @@ struct decon_device {
 	bool				sblock_disable;
 	bool				sdma_map_disable;
 #ifdef CONFIG_FOLDER_DUAL_PANEL
-	int hall_ic_state;
+	int				hall_ic_state;
+	bool				panel_flipping;
 #endif
 };
 
@@ -944,7 +945,7 @@ static inline bool decon_lpd_enter_cond(struct decon_device *decon)
 	&& (!dsim->priv.hmt_on)
 #endif
 #if defined(CONFIG_EXYNOS_DECON_MDNIE)
-	&& (decon->mdnie->auto_brightness < 6)
+	&& (!decon->mdnie->hbm)
 #endif
 		&& (atomic_inc_return(&decon->lpd_trig_cnt) >= DECON_ENTER_LPD_CNT));
 

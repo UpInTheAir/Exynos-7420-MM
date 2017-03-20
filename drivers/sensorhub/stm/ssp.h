@@ -371,6 +371,7 @@ struct ssp_msg {
 	u8 cmd;
 	u16 length;
 	u16 options;
+	u64 timestamp;
 	u32 data;
 
 	struct list_head list;
@@ -476,6 +477,8 @@ struct ssp_data {
 	s8 batchOptBuf[SENSOR_MAX];
 	u64 lastTimestamp[SENSOR_MAX];
 	bool reportedData[SENSOR_MAX];
+	u64 LastSensorTimeforReset[SENSOR_MAX]; //only use accel and light
+	u32 IsBypassMode[SENSOR_MAX]; 			//only use accel and light
 
 	bool skipEventReport;
 	bool cameraGyroSyncMode;
@@ -537,7 +540,6 @@ struct ssp_data {
 	int pressure_type;
 
 	bool debug_enable;
-	atomic_t int_gyro_enable;
 	int gyro_lib_state;
 	char sensor_state[SENSOR_MAX + 1];
 };

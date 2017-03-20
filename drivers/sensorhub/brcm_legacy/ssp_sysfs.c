@@ -292,15 +292,6 @@ static ssize_t set_sensors_enable(struct device *dev,
 
 			if (!(uNewEnable & (1 << uChangedSensor))) {
 				data->reportedData[uChangedSensor] = false;
-
-				/* Intterupt Gyro */
-				if (uChangedSensor == INTERRUPT_GYRO_SENSOR) {
-					if (!atomic_read(&data->int_gyro_enable)) {
-						pr_info("[SSP] skip removing int_gyrosensor");
-						continue;
-					}
-				}
-
 				ssp_remove_sensor(data, uChangedSensor,
 					uNewEnable); /* disable */
 			} else { /* Change to ADD_SENSOR_STATE from KitKat */
@@ -327,14 +318,6 @@ static ssize_t set_sensors_enable(struct device *dev,
 				}
 				data->aiCheckStatus[uChangedSensor] = ADD_SENSOR_STATE;
 
-				/* Intterupt Gyro */
-				if (uChangedSensor == INTERRUPT_GYRO_SENSOR) {
-					if (!atomic_read(&data->int_gyro_enable)) {
-						pr_info("[SSP] skip enabling int_gyrosensor");
-						continue;
-					}
-				}
-
 				enable_sensor(data, uChangedSensor, data->adDelayBuf[uChangedSensor]);
 			}
 			break;
@@ -360,29 +343,9 @@ static ssize_t set_flush(struct device *dev,
 	if (!(atomic_read(&data->aSensorEnable) & (1 << sensor_type)))
 		return -EINVAL;
 
-	/* Intterupt Gyro */
-	if (sensor_type == INTERRUPT_GYRO_SENSOR) {
-		if (!atomic_read(&data->int_gyro_enable)) {
-			data->aiCheckStatus[INTERRUPT_GYRO_SENSOR]
-				= ADD_SENSOR_STATE;
-			enable_sensor(data, INTERRUPT_GYRO_SENSOR,
-				data->adDelayBuf[INTERRUPT_GYRO_SENSOR]);
-		}
-	}
-
 	if (flush(data, sensor_type) < 0) {
 		pr_err("[SSP] ssp returns error for flush(%x)\n", sensor_type);
 		return -EINVAL;
-	}
-
-	/* Intterupt Gyro */
-	if (sensor_type == INTERRUPT_GYRO_SENSOR) {
-		if (!atomic_read(&data->int_gyro_enable)) {
-			int64_t delay = data->adDelayBuf[INTERRUPT_GYRO_SENSOR];
-			ssp_remove_sensor(data,	INTERRUPT_GYRO_SENSOR,
-					atomic64_read(&data->aSensorEnable));
-			data->adDelayBuf[INTERRUPT_GYRO_SENSOR] = delay;
-		}
 	}
 
 	return size;
@@ -880,54 +843,6 @@ static void remove_voice_sysfs(struct ssp_data *data)
 	sensors_unregister(data->voice_device, voice_attrs);
 }
 
-
-static ssize_t show_int_gyro_enable(struct device *dev,
-	struct device_attribute *attr, char *buf)
-{
-	struct ssp_data *data  = dev_get_drvdata(dev);
-	return snprintf(buf, PAGE_SIZE, "%d,%d\n",
-		atomic_read(&data->int_gyro_enable),
-		atomic_read(&data->aSensorEnable)
-		& (1 << INTERRUPT_GYRO_SENSOR));
-}
-
-static ssize_t set_int_gyro_enable(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t size)
-{
-	struct ssp_data *data  = dev_get_drvdata(dev);
-	int64_t buffer;
-	bool int_gyro_enable;
-
-	if (kstrtoll(buf, 10, &buffer) < 0)
-		return -EINVAL;
-
-	if (buffer != 1 && buffer != 0)
-		return -EINVAL;
-
-	int_gyro_enable = (bool)buffer;
-
-	if (atomic_read(&data->int_gyro_enable) == int_gyro_enable)
-		return size;
-
-	if (atomic_read(&data->aSensorEnable)
-			& (1 << INTERRUPT_GYRO_SENSOR)) {
-		if (int_gyro_enable) {
-			data->aiCheckStatus[INTERRUPT_GYRO_SENSOR]
-				= ADD_SENSOR_STATE;
-			enable_sensor(data, INTERRUPT_GYRO_SENSOR,
-				data->adDelayBuf[INTERRUPT_GYRO_SENSOR]);
-		} else {
-			int64_t delay = data->adDelayBuf[INTERRUPT_GYRO_SENSOR];
-			ssp_remove_sensor(data,	INTERRUPT_GYRO_SENSOR,
-					atomic_read(&data->aSensorEnable));
-			data->adDelayBuf[INTERRUPT_GYRO_SENSOR] = delay;
-		}
-	}
-
-	atomic_set(&data->int_gyro_enable, int_gyro_enable);
-	return size;
-}
-
 static ssize_t show_sensor_state(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
@@ -1007,8 +922,6 @@ static struct device_attribute dev_attr_sig_motion_poll_delay
 static struct device_attribute dev_attr_step_cnt_poll_delay
 	= __ATTR(poll_delay, S_IRUGO | S_IWUSR | S_IWGRP,
 	show_step_cnt_delay, set_step_cnt_delay);
-static DEVICE_ATTR(int_gyro_enable, S_IRUGO | S_IWUSR | S_IWGRP,
-	show_int_gyro_enable, set_int_gyro_enable);
 static DEVICE_ATTR(sensor_state, S_IRUGO, show_sensor_state, NULL);
 
 static struct device_attribute *mcu_attrs[] = {
@@ -1036,7 +949,6 @@ static struct device_attribute *mcu_attrs[] = {
 	&dev_attr_pickup_poll_delay,
 	&dev_attr_ssp_flush,
 	&dev_attr_shake_cam,
-	&dev_attr_int_gyro_enable,
 	&dev_attr_sensor_state,
 	NULL,
 };

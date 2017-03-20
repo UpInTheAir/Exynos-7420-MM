@@ -16,6 +16,10 @@
 #define TUI_IOCTL_H_
 
 
+struct tlc_tui_display_t {
+	uint32_t	width;
+	uint32_t	height;
+};
 
 /* Response header */
 struct tlc_tui_response_t {
@@ -44,5 +48,6 @@ struct tlc_tui_response_t {
 #define TUI_IO_NOTIFY	_IOW(TUI_IO_MAGIC, 1, uint32_t)
 #define TUI_IO_WAITCMD	_IOR(TUI_IO_MAGIC, 2, uint32_t)
 #define TUI_IO_ACK	_IOW(TUI_IO_MAGIC, 3, struct tlc_tui_response_t)
+#define TUI_IO_DISPLAY_NOTIFY	_IOW(TUI_IO_MAGIC, 4, struct tlc_tui_display_t)
 
 #endif /* TUI_IOCTL_H_ */

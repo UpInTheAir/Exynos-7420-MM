@@ -239,6 +239,7 @@ struct max77843_charger_data {
 	int		irq_bypass;
 	int		irq_batp;
 	int		irq_aicl;
+	int		irq_aicl_enabled;
 
 	int		irq_battery;
 	int		irq_chg;
@@ -266,6 +267,7 @@ struct max77843_charger_data {
 	int		wc_current;
 	int		wc_pre_current;
 
+	int vbus_changing;
 	bool afc_detect;
 	bool is_mdock;
 	bool store_mode;

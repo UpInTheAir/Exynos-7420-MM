@@ -1,7 +1,7 @@
 /*
  * Linux DHD Bus Module for PCIE
  *
- * Copyright (C) 1999-2016, Broadcom Corporation
+ * Copyright (C) 1999-2017, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_pcie_linux.c 610510 2016-01-07 05:46:48Z $
+ * $Id: dhd_pcie_linux.c 683104 2017-02-06 06:46:17Z $
  */
 
 
@@ -367,6 +367,9 @@ static int dhdpcie_resume_host_dev(dhd_bus_t *bus)
 #ifdef CONFIG_ARCH_MSM
 	bcmerror = dhdpcie_start_host_pcieclock(bus);
 #endif /* CONFIG_ARCH_MSM */
+#ifdef CONFIG_ARCH_TEGRA
+	bcmerror = tegra_pcie_pm_resume();
+#endif /* CONFIG_ARCH_TEGRA */
 	if (bcmerror < 0) {
 		DHD_ERROR(("%s: PCIe RC resume failed!!! (%d)\n",
 			__FUNCTION__, bcmerror));
@@ -393,6 +396,9 @@ static int dhdpcie_suspend_host_dev(dhd_bus_t *bus)
 #ifdef CONFIG_ARCH_MSM
 	bcmerror = dhdpcie_stop_host_pcieclock(bus);
 #endif	/* CONFIG_ARCH_MSM */
+#ifdef CONFIG_ARCH_TEGRA
+	bcmerror = tegra_pcie_pm_suspend();
+#endif /* CONFIG_ARCH_TEGRA */
 	return bcmerror;
 }
 
@@ -421,7 +427,12 @@ int dhdpcie_pci_suspend_resume(dhd_bus_t *bus, bool state)
 		dhdpcie_pme_active(bus->osh, state);
 #endif /* !BCMPCIE_OOB_HOST_WAKE */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27))
+#if defined(DHD_HANG_SEND_UP_TEST)
+		if (bus->is_linkdown ||
+			bus->dhd->req_hang_type == HANG_REASON_PCIE_RC_LINK_UP_FAIL) {
+#else /* DHD_HANG_SEND_UP_TEST */
 		if (bus->is_linkdown) {
+#endif /* DHD_HANG_SEND_UP_TEST */
 			bus->dhd->hang_reason = HANG_REASON_PCIE_RC_LINK_UP_FAIL;
 			dhd_os_send_hang_message(bus->dhd);
 		}
@@ -627,6 +638,9 @@ int dhdpcie_get_resource(dhdpcie_info_t *dhdpcie_info)
 	ulong bar1_size;
 	struct pci_dev *pdev = NULL;
 	pdev = dhdpcie_info->dev;
+#ifdef EXYNOS_PCIE_MODULE_PATCH
+	pci_restore_state(pdev);
+#endif /* EXYNOS_MODULE_PATCH */
 	do {
 		if (pci_enable_device(pdev)) {
 			printf("%s: Cannot enable PCI device\n", __FUNCTION__);
@@ -673,6 +687,10 @@ int dhdpcie_get_resource(dhdpcie_info_t *dhdpcie_info)
 			}
 		}
 #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0) */
+
+#ifdef EXYNOS_PCIE_MODULE_PATCH
+		pci_save_state(pdev);
+#endif /* EXYNOS_MODULE_PATCH */
 
 		DHD_TRACE(("%s:Phys addr : reg space = %p base addr 0x"PRINTF_RESOURCE" \n",
 			__FUNCTION__, dhdpcie_info->regs, bar0_addr));
@@ -1104,15 +1122,16 @@ dhdpcie_enable_device(dhd_bus_t *bus)
 		return BCME_ERROR;
 	}
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)) && !defined(CONFIG_SOC_EXYNOS8890)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)) && (LINUX_VERSION_CODE < \
+	KERNEL_VERSION(3, 19, 0)) && !defined(CONFIG_SOC_EXYNOS8890)
 	/* Updated with pci_load_and_free_saved_state to compatible
-	 * with kernel 3.14 or higher
+	 * with Kernel version 3.14.0 to 3.18.41.
 	 */
 	pci_load_and_free_saved_state(bus->dev, &pch->default_state);
 	pch->default_state = pci_store_saved_state(bus->dev);
 #else
 	pci_load_saved_state(bus->dev, pch->default_state);
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)) && !CONFIG_SOC_EXYNOS8890 */
+#endif /* LINUX_VERSION >= 3.14.0 && LINUX_VERSION < 3.19.0 && !CONFIG_SOC_EXYNOS8890 */
 
 	pci_restore_state(bus->dev);
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)) */

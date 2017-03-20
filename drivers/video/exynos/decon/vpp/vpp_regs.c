@@ -344,11 +344,25 @@ void vpp_hw_set_scale_ratio(struct vpp_dev *vpp)
 
 void vpp_hw_set_in_buf_addr(struct vpp_dev *vpp)
 {
+	struct decon_device *decon = get_decon_drvdata(0);
 	struct vpp_params *vpp_parm = &vpp->config->vpp_parm;
+	dma_addr_t cb_addr = 0;
+	u32 addr;
+
 	dev_dbg(DEV, "y : %pa, cb : %pa, cr : %pa\n",
 		&vpp_parm->addr[0], &vpp_parm->addr[1], &vpp_parm->addr[2]);
 	writel(vpp_parm->addr[0], vpp->regs + VG_BASE_ADDR_Y(0));
 	writel(vpp_parm->addr[1], vpp->regs + VG_BASE_ADDR_CB(0));
+	if (vpp->id == 2)
+		cb_addr = decon->vgr0_cb_addr;
+	else if (vpp->id == 3)
+		cb_addr = decon->vgr1_cb_addr;
+	if(cb_addr > 0) {
+		addr = readl(vpp->regs + VG_BASE_ADDR_CB(0));
+		if(addr != (u32)cb_addr)
+			dev_err(DEV, "vpp CB_ADDR is incorrect(0x%x, 0x%x\n",
+					addr, (u32)cb_addr);
+	}
 }
 
 void vpp_hw_set_in_size(struct vpp_dev *vpp)

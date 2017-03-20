@@ -1,7 +1,7 @@
 /*
  * Linux DHD Bus Module for PCIE
  *
- * Copyright (C) 1999-2016, Broadcom Corporation
+ * Copyright (C) 1999-2017, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_pcie.h 607608 2015-12-21 13:14:19Z $
+ * $Id: dhd_pcie.h 683104 2017-02-06 06:46:17Z $
  */
 
 
@@ -105,10 +105,6 @@ extern int exynos_pcie_deregister_event(struct exynos_pcie_register_event *reg);
 /* Device console log buffer state */
 #define CONSOLE_LINE_MAX	192
 #define CONSOLE_BUFFER_MAX	(8 * 1024)
-
-#ifndef MAX_CNTL_D3ACK_TIMEOUT
-#define MAX_CNTL_D3ACK_TIMEOUT 2
-#endif /* MAX_CNTL_D3ACK_TIMEOUT */
 
 #ifdef DHD_DEBUG
 
@@ -310,6 +306,11 @@ extern int exynos_pcie_pm_suspend(int ch_num);
 extern int exynos_pcie_pm_resume(int ch_num);
 #endif /* CONFIG_MACH_UNIVERSAL5433 */
 #endif /* USE_EXYNOS_PCIE_RC_PMPATCH */
+
+#ifdef CONFIG_ARCH_TEGRA
+extern int tegra_pcie_pm_suspend(void);
+extern int tegra_pcie_pm_resume(void);
+#endif /* CONFIG_ARCH_TEGRA */
 
 extern int dhd_buzzz_dump_dngl(dhd_bus_t *bus);
 #endif /* dhd_pcie_h */

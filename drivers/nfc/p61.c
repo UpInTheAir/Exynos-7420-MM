@@ -157,6 +157,7 @@ struct p61_dev {
 	bool isGpio_cfgDone;
 	bool enabled_clk;
 	struct wake_lock ese_lock;
+	bool device_opened;
 #endif
 };
 
@@ -488,6 +489,11 @@ static int p61_dev_open(struct inode *inode, struct file *filp)
 			struct p61_dev, p61_device);
 
 	filp->private_data = p61_dev;
+	if (p61_dev->device_opened) {
+		P61_ERR_MSG("%s - ALREADY opened!\n", __func__);
+		return -EBUSY;
+	}
+	p61_dev->device_opened = true;	
 	P61_DBG_MSG("%s : Major No: %d, Minor No: %d\n", __func__,
 			imajor(inode), iminor(inode));
 
@@ -610,6 +616,12 @@ static long p61_dev_ioctl(struct file *filp, unsigned int cmd,
 		pr_info(KERN_ALERT " P61_GET_SPM_STATUS: exit");
 		break;
 
+	case P61_GET_ESE_ACCESS:
+		P61_DBG_MSG(KERN_ALERT " P61_GET_ESE_ACCESS: enter");
+		ret = pn547_dev_ioctl(filp, P547_GET_ESE_ACCESS, arg);
+		P61_DBG_MSG(KERN_ALERT " P61_GET_ESE_ACCESS ret: %d exit",ret);
+		break;
+
 	default:
 		pr_info("%s no matching ioctl!\n", __func__);
 		ret = -EINVAL;
@@ -646,6 +658,7 @@ static int p61_dev_release(struct inode *inode, struct file *file)
 		pn547_dev_ioctl (file, P61_SET_SPI_PWR, 0);
 		pwr_req_on = 0;
 	}
+	p61_dev->device_opened = false;
 	return 0;
 }
 
@@ -1224,6 +1237,7 @@ static int p61_probe(struct spi_device *spi)
 #endif
 
 	wake_lock_init(&p61_dev->ese_lock, WAKE_LOCK_SUSPEND, "ese_wake_lock");
+	p61_dev->device_opened = false;
 	ret = misc_register(&p61_dev->p61_device);
 	if (ret < 0)
 	{

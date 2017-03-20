@@ -30,8 +30,10 @@
 #define HV_CMD_PASS	0
 
 typedef enum max77833_muic_hv_set_value {
+	QC_SET_5V		= 0x04,
 	QC_SET_9V		= 0x09,
 
+	FCHV_SET_5V		= 0x08,
 	FCHV_SET_9V		= 0x46,
 	FCHV_SET_POWERPACK	= 0x24,
 } muic_hv_set_val;

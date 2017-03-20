@@ -32,6 +32,8 @@
 #include "tui-hal.h"
 #if defined(CONFIG_TOUCHSCREEN_FTS) || defined(CONFIG_TOUCHSCREEN_FTS5AD56)
 #include <linux/i2c/fts.h>
+#elif defined(CONFIG_TOUCHSCREEN_MELFAS_MMS449)
+#include <linux/input/mt.h>
 #endif
 
 /* I2C register for reset */
@@ -372,12 +374,24 @@ uint32_t hal_tui_alloc(tuiAllocBuffer_t allocbuffer[MAX_DCI_BUFFER_NUMBER],
 	ion_phys_addr_t phys_addr;
 	unsigned long offset = 0;
 	size_t size;
+	dbuf = NULL;
 
 	size=allocsize*(count+1);
 
 	client = ion_client_create(ion_exynos, "TUI module");
+    if (IS_ERR(client)) {
+        pr_err("failed to ion_client_create\n");
+        return ret;
+    }
+
 	handle = ion_alloc(client, size, 0, EXYNOS_ION_HEAP_EXYNOS_CONTIG_MASK,
 							ION_EXYNOS_VIDEO_MASK);
+    if (IS_ERR_OR_NULL(handle)) {
+        pr_err("[%s:%d] ION memory allocation fail.[err:%lx]\n", __func__, __LINE__, PTR_ERR(handle));
+		handle = NULL;
+        hal_tui_free();
+        return ret;
+    }
 
 	dbuf = ion_share_dma_buf(client, handle);
 	buf_addr = decon_map_sec_dma_buf(dbuf, 0);
@@ -472,9 +486,13 @@ void decon_free_sec_dma_buf(int plane)
 
 void hal_tui_free(void)
 {
-	decon_free_sec_dma_buf(0);
-	dma_buf_put(dbuf);
-	ion_free(client, handle);
+	if (dbuf != NULL) {
+		decon_free_sec_dma_buf(0);
+		dma_buf_put(dbuf);
+	}
+	if (handle != NULL){
+		ion_free(client, handle);
+	}
 	ion_client_destroy(client);
 }
 
@@ -484,7 +502,7 @@ uint32_t hal_tui_deactivate(void)
 	switch_set_state(&tui_switch, TRUSTEDUI_MODE_VIDEO_SECURED);
 	pr_info(KERN_ERR "Disable touch!\n");
 	disable_irq(tsp_irq_num);
-#if defined(CONFIG_TOUCHSCREEN_FTS) || defined(CONFIG_TOUCHSCREEN_FTS5AD56)
+#if defined(CONFIG_TOUCHSCREEN_FTS) || defined(CONFIG_TOUCHSCREEN_FTS5AD56)|| defined(CONFIG_TOUCHSCREEN_MELFAS_MMS449)
 	tui_delay(5);
 	trustedui_mode_on();
 	tui_delay(95);

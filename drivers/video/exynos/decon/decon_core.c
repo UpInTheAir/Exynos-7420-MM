@@ -51,7 +51,6 @@
 #include "dsim.h"
 #include "decon_helper.h"
 #include "mdnie_reg.h"
-#include "./panels/lcd_ctrl.h"
 #include "../../../staging/android/sw_sync.h"
 #include "vpp/vpp_core.h"
 
@@ -740,9 +739,14 @@ static int decon_set_win_blocking_mode(struct decon_device *decon, struct decon_
 		return 0;
 
 	/* Blocking Mode is not supported if there is a rotation and scaling */
+#ifdef CONFIG_FB_WINDOW_UPDATE
 	if (is_vpp_type(config->idma_type) && (is_rotation(config)||
 		does_layer_need_scale(config)))
 		return 0;
+#else
+	if (is_vpp_type(config->idma_type) && (is_rotation(config)))
+		return 0;
+#endif
 
 	if (decon->dma_block_disable)
 		return 0;
@@ -781,12 +785,13 @@ static int decon_set_win_blocking_mode(struct decon_device *decon, struct decon_
 		/* overlaps or not */
 		if (decon_intersect(&r1, &r2)) {
 			decon_intersection(&r1, &r2, &overlap_rect);
+#ifdef CONFIG_FB_WINDOW_UPDATE
 			if (!is_decon_rect_differ(&r1, &overlap_rect)) {
 				/* window rect and blocking rect is same. */
 				win_config[win->index].state = DECON_WIN_STATE_DISABLED;
 				return 1;
 			}
-
+#endif
 			if (overlap_rect.right - overlap_rect.left + 1 <
 					MIN_BLK_MODE_WIDTH ||
 				overlap_rect.bottom - overlap_rect.top + 1 <
@@ -823,11 +828,13 @@ static int decon_set_win_blocking_mode(struct decon_device *decon, struct decon_
 						rect_height(&overlap_rect) < MIN_BLK_MODE_HEIGHT - 1)
 					return 0;
 				memcpy(&block_rect, &overlap_rect, sizeof(struct decon_rect));
+#ifdef CONFIG_FB_WINDOW_UPDATE
 				if (!is_decon_rect_differ(&r1, &block_rect)) {
 					/* window rect and blocking rect is same. */
 					win_config[win->index].state = DECON_WIN_STATE_DISABLED;
 					return 1;
 				}
+#endif
 				enabled = true;
 			}
 		}
@@ -1183,6 +1190,11 @@ static void decon_wait_for_framedone(struct decon_device *decon)
 	}
 }
 
+#ifdef CONFIG_FB_DSU
+static void decon_dsu_handler(struct decon_device *decon);
+void decon_reg_configure_lcd_dsu(u32 id, enum decon_dsi_mode dsi_mode, struct decon_lcd *lcd_info);
+#endif
+
 static int decon_reg_ddi_partial_cmd(struct decon_device *decon, struct decon_win_rect *rect)
 {
 	struct decon_win_rect win_rect;
@@ -1192,17 +1204,24 @@ static int decon_reg_ddi_partial_cmd(struct decon_device *decon, struct decon_wi
 	/* TODO: need to set DSI_IDX */
 	decon_reg_wait_linecnt_is_zero_timeout(decon->id, 0, 35 * 1000);
 	DISP_SS_EVENT_LOG(DISP_EVT_LINECNT_ZERO, &decon->sd, ktime_set(0, 0));
+#ifdef CONFIG_DECON_MIPI_DSI_PKTGO
+	ret = v4l2_subdev_call(decon->output_sd, core, ioctl, DSIM_IOC_PKT_GO_DISABLE, NULL);
+	if (ret)
+		decon_err("Failed to disable Packet-go in %s\n", __func__);
+#endif
+
+#ifdef CONFIG_FB_DSU
+	if( decon->need_DSU_update != DECON_DSU_DONE )
+		decon_dsu_handler(decon);
+#endif
+
 	/* Partial Command */
 	win_rect.x = rect->x;
 	win_rect.y = rect->y;
 	/* w is right & h is bottom */
 	win_rect.w = rect->x + rect->w - 1;
 	win_rect.h = rect->y + rect->h - 1;
-#ifdef CONFIG_DECON_MIPI_DSI_PKTGO
-	ret = v4l2_subdev_call(decon->output_sd, core, ioctl, DSIM_IOC_PKT_GO_DISABLE, NULL);
-	if (ret)
-		decon_err("Failed to disable Packet-go in %s\n", __func__);
-#endif
+
 	ret = v4l2_subdev_call(decon->output_sd, core, ioctl,
 			DSIM_IOC_PARTIAL_CMD, &win_rect);
 	if (ret) {
@@ -1412,6 +1431,13 @@ int decon_enable(struct decon_device *decon)
 	struct dsim_device *dsim = NULL;
 #endif
 
+#ifdef CONFIG_LCD_DOZE_MODE
+	int is_lcd_on = 0;
+
+	if ((decon->id == 0) && (decon->state != DECON_STATE_LPD_EXIT_REQ)) {
+		is_lcd_on = 1;
+	}
+#endif
 	decon_dbg("enable decon-%s\n", decon->id ? "ext" : "int");
 	exynos_ss_printk("%s:state %d: active %d:+\n", __func__,
 				decon->state, pm_runtime_active(decon->dev));
@@ -1423,11 +1449,43 @@ int decon_enable(struct decon_device *decon)
 		decon_info("decon-%s: alpm(%d)\n", decon->id ? "ext" : "int", alpm);
 	}
 #endif
+
+#ifdef CONFIG_LCD_DOZE_MODE
+	if (is_lcd_on) {
+		if ((decon->decon_doze == DECON_DOZE_STATE_DOZE) ||
+			(decon->decon_doze == DECON_DOZE_STATE_DOZE_SUSPEND)) {
+			if (decon->vsync_backup == true) {
+				if (decon->ignore_vsync == true) {
+					decon->ignore_vsync = false;
+				}
+				decon->vsync_backup = false;
+			}
+		}
+	}
+#endif
+
 	if (decon->state != DECON_STATE_LPD_EXIT_REQ)
 		mutex_lock(&decon->output_lock);
 
 	if (decon->state == DECON_STATE_ON) {
 		decon_warn("decon%d already enabled\n", decon->id);
+#ifdef CONFIG_LCD_DOZE_MODE
+		if (is_lcd_on) {
+			decon_info("%s :doze mode : %d\n", __func__, decon->decon_doze);
+
+			if ((decon->decon_doze == DECON_DOZE_STATE_DOZE) ||
+				(decon->decon_doze == DECON_DOZE_STATE_DOZE_SUSPEND)) {
+				ret = v4l2_subdev_call(decon->output_sd, video, s_stream, DSIM_REQ_POWER_ON);
+				if (ret) {
+					decon_err("starting stream failed for %s\n",
+							decon->output_sd->name);
+					goto err;
+				}
+				decon->req_display_on = 1;
+				decon->decon_doze = DECON_DOZE_STATE_NORMAL;
+			}
+		}
+#endif
 		goto err;
 	}
 
@@ -1489,7 +1547,6 @@ int decon_enable(struct decon_device *decon)
 			}
 		}
 	}
-
 	ret = iovmm_activate(decon->dev);
 	if (ret < 0) {
 		decon_err("failed to reactivate vmm\n");
@@ -1510,9 +1567,9 @@ int decon_enable(struct decon_device *decon)
 
 	decon_to_psr_info(decon, &psr);
 #ifdef CONFIG_LCD_ALPM
-		if ((decon->state != DECON_STATE_LPD_EXIT_REQ)	&& (!alpm)) {
+	if ((decon->state != DECON_STATE_LPD_EXIT_REQ)	&& (!alpm)) {
 #else
-		if (decon->state != DECON_STATE_LPD_EXIT_REQ) {
+	if (decon->state != DECON_STATE_LPD_EXIT_REQ) {
 #endif
 
 	/* In case of resume*/
@@ -1567,6 +1624,15 @@ int decon_enable(struct decon_device *decon)
 	}
 
 	decon->state = DECON_STATE_ON;
+#ifdef CONFIG_LCD_DOZE_MODE
+	if (is_lcd_on) {
+		if ((decon->decon_doze == DECON_DOZE_STATE_DOZE) ||
+			(decon->decon_doze == DECON_DOZE_STATE_DOZE_SUSPEND)) {
+			decon->req_display_on = 1;
+		}
+		decon->decon_doze = DECON_DOZE_STATE_NORMAL;
+	}
+#endif
 	decon_reg_clear_int(decon->id);
 
 	decon_reg_set_int(decon->id, &psr, DSI_MODE_SINGLE, 1);
@@ -1588,7 +1654,13 @@ int decon_disable(struct decon_device *decon)
 	int state = decon->state;
 	int old_plane_cnt[MAX_DECON_EXT_WIN];
 	struct esd_protect *esd = &decon->esd;
+#ifdef CONFIG_LCD_DOZE_MODE
+	int is_lcd_off = 0;
 
+	if ((decon->id == 0) && (decon->state != DECON_STATE_LPD_EXIT_REQ)) {
+		is_lcd_off = 1;
+	}
+#endif
 	exynos_ss_printk("disable decon-%s, state(%d) cnt %d\n", decon->id ? "ext" : "int",
 				decon->state, pm_runtime_active(decon->dev));
 
@@ -1669,9 +1741,7 @@ int decon_disable(struct decon_device *decon)
 		decon->vpp_usage_bitmask = 0;
 		decon_vpp_stop(decon, true);
 	}
-
 	iovmm_deactivate(decon->dev);
-
 	/* Synchronize the decon->state with irq_handler */
 	spin_lock_irqsave(&decon->slock, irq_flags);
 	if (state == DECON_STATE_LPD_ENT_REQ)
@@ -1714,6 +1784,7 @@ int decon_disable(struct decon_device *decon)
 					__func__, decon->output_sd->name);
 			goto err;
 		}
+#ifdef CONFIG_FB_WINDOW_UPDATE
 		/* in case of output type is dsim, clear partial update info*/
 		if ((decon->out_type == DECON_OUT_DSI) && decon->need_update) {
 			decon->update_win.x = 0;
@@ -1721,6 +1792,7 @@ int decon_disable(struct decon_device *decon)
 			decon->update_win.w = 0;
 			decon->update_win.h = 0;
 		}
+#endif
 		decon->state = DECON_STATE_LPD;
 	} else {
 		if (decon->out_type != DECON_OUT_WB) {
@@ -1745,6 +1817,10 @@ int decon_disable(struct decon_device *decon)
 		}
 
 		decon->state = DECON_STATE_OFF;
+#ifdef CONFIG_LCD_DOZE_MODE
+		if (is_lcd_off)
+			decon->decon_doze = DECON_DOZE_STATE_SUSPEND;
+#endif
 	}
 
 err:
@@ -1754,7 +1830,6 @@ err:
 		mutex_unlock(&decon->output_lock);
 	return ret;
 }
-
 static int decon_blank(int blank_mode, struct fb_info *info)
 {
 	struct decon_win *win = info->par;
@@ -2620,6 +2695,16 @@ static inline void decon_update_2_full(struct decon_device *decon,
 	regs->update_win.y = 0;
 	regs->update_win.w = lcd_info->xres;
 	regs->update_win.h = lcd_info->yres;
+
+#ifdef CONFIG_FB_DSU
+    if( decon->DSU_mode != DECON_DSU_RES_DEFAULT) {
+        decon->update_win.w = decon->DSU_rect.w;
+        decon->update_win.h = decon->DSU_rect.h;
+        regs->update_win.w = decon->DSU_rect.w;
+        regs->update_win.h = decon->DSU_rect.h;
+    }
+#endif
+
 	decon_win_update_dbg("[WIN_UPDATE]update2org: [%d %d %d %d]\n",
 			decon->update_win.x, decon->update_win.y, decon->update_win.w, decon->update_win.h);
 	return;
@@ -2723,6 +2808,19 @@ static void decon_set_win_update_config(struct decon_device *decon,
 			memset(update_config, 0, sizeof(struct decon_win_config));
 	}
 #endif
+#ifdef CONFIG_LCD_DOZE_MODE
+	if ((decon->out_type == DECON_OUT_DSI) &&
+		(decon->decon_doze == DECON_DOZE_STATE_DOZE)) {
+#ifdef CONFIG_FB_DSU
+			if( decon->DSU_mode != DECON_DSU_RES_DEFAULT ) {
+				decon_update_2_full(decon, regs, lcd_info, true);
+				return;
+			}
+#endif
+		memset(update_config, 0, sizeof(struct decon_win_config));
+	}
+#endif
+
 	if (decon->out_type == DECON_OUT_DSI) {
 		if (decon->force_fullupdate)
 			memset(update_config, 0, sizeof(struct decon_win_config));
@@ -2738,6 +2836,13 @@ static void decon_set_win_update_config(struct decon_device *decon,
 
 	decon_calibrate_win_update_size(decon, win_config, update_config);
 
+#ifdef CONFIG_FB_DSU
+	if( decon->need_DSU_update ) {
+		decon_update_2_full(decon, regs, lcd_info, true);
+		if( decon->need_DSU_update == DECON_DSU_UPDATE_RECT ) decon->need_DSU_update = DECON_DSU_DONE;
+		return;
+	} else
+#endif
 	/* if the current mode is not WINDOW_UPDATE, set the config as WINDOW_UPDATE */
 	if ((update_config->state == DECON_WIN_STATE_UPDATE) &&
 			((update_config->dst.x != decon->update_win.x) ||
@@ -2825,7 +2930,9 @@ static void decon_set_win_update_config(struct decon_device *decon,
 			continue;
 		}
 		memcpy(&temp_config, config, sizeof(struct decon_win_config));
+#ifdef CONFIG_FB_WINDOW_UPDATE
 		is_scale_layer = does_layer_need_scale(config);
+#endif
 		if (update_config->dst.x > config->dst.x)
 			config->dst.w = min(update_config->dst.w,
 					config->dst.x + config->dst.w - update_config->dst.x);
@@ -2842,7 +2949,7 @@ static void decon_set_win_update_config(struct decon_device *decon,
 
 		config->dst.x = max(config->dst.x - update_config->dst.x, 0);
 		config->dst.y = max(config->dst.y - update_config->dst.y, 0);
-
+#ifdef CONFIG_FB_WINDOW_UPDATE
 		if (!is_scale_layer) {
 			if (update_config->dst.y > temp_config.dst.y) {
 				config->src.y += (update_config->dst.y - temp_config.dst.y);
@@ -2854,7 +2961,7 @@ static void decon_set_win_update_config(struct decon_device *decon,
 			config->src.w = config->dst.w;
 			config->src.h = config->dst.h;
 		}
-
+#endif
 		if (regs->need_update == true)
 			decon_win_update_dbg("[WIN_UPDATE]win_idx %d: idma_type %d:,"
 				"dst[%d %d %d %d] -> [%d %d %d %d], src[%d %d %d %d] -> [%d %d %d %d]\n",
@@ -2926,6 +3033,9 @@ static void decon_check_vpp_used(struct decon_device *decon,
 	int i = 0;
 	decon->vpp_usage_bitmask = 0;
 
+	decon->vgr0_cb_addr = 0;
+	decon->vgr1_cb_addr = 0;
+
 	for (i = 0; i < decon->pdata->max_win; i++) {
 		struct decon_win *win = decon->windows[i];
 		if (is_vpp_type(regs->vpp_config[i].idma_type)) {
@@ -2938,6 +3048,18 @@ static void decon_check_vpp_used(struct decon_device *decon,
 						regs->vpp_config[i].idma_type);
 				decon->vpp_usage_bitmask |= (1 << win->vpp_id);
 				decon->vpp_used[win->vpp_id] = true;
+
+				/* CB addr > 0 */
+				if (regs->vpp_config[i].vpp_parm.addr[1] > 0) {
+					if (win->vpp_id == 2) { /* VGR0 case */
+						decon->vgr0_cb_addr =
+							regs->vpp_config[i].vpp_parm.addr[1];
+					} else if (win->vpp_id == 3) { /* VGR1 case */
+						decon->vgr1_cb_addr =
+							regs->vpp_config[i].vpp_parm.addr[1];
+					}
+				}
+
 			}
 		}
 	}
@@ -3311,11 +3433,13 @@ static void decon_set_smart_dma_blocking(struct decon_device *decon,
 	if ((regs->num_of_window <= 1) || !win_id)
 		goto skip_crc_check;
 
+#ifdef CONFIG_FB_WINDOW_UPDATE
 	/* If window update is enabled, skip blocking mode */
 	if ((decon->need_update || regs->need_update) &&
 		((regs->update_win.w != lcd_info->xres) ||
 			(regs->update_win.h != lcd_info->yres)))
 		goto skip_crc_check;
+#endif
 
 	if (!(regs->wincon[win_id] & WINCON_ENWIN))
 		goto skip_crc_check;
@@ -3331,10 +3455,14 @@ static void decon_set_smart_dma_blocking(struct decon_device *decon,
 		goto skip_crc_check;
 
 	/* Blocking Mode is not supported if there is a rotation and scaling */
+#ifdef CONFIG_FB_WINDOW_UPDATE
 	if (is_vpp_type(config->idma_type) && (is_rotation(config)||
 		does_layer_need_scale(config)))
 		goto skip_crc_check;
-
+#else
+	if (is_vpp_type(config->idma_type) && (is_rotation(config)))
+		goto skip_crc_check;
+#endif
 	/* if window size is smaller than 25% of LCD size, exit from here */
 	if ((config->dst.w * config->dst.h << 2) < lcd_info->xres * lcd_info->yres)
 		goto skip_crc_check;
@@ -3545,6 +3673,10 @@ static void __decon_update_regs(struct decon_device *decon, struct decon_reg_dat
 				regs->wb_dma_buf_data.dma_addr);
 
 	decon_to_psr_info(decon, &psr);
+	if (decon->int_fifo_status == false) {
+		decon_reg_set_int_fifo(decon->id, 1);
+		decon->int_fifo_status = true;
+	}
 	decon_reg_start(decon->id, decon->pdata->dsi_mode, &psr);
 #ifdef CONFIG_DECON_MIPI_DSI_PKTGO
 	if (!decon->id) {
@@ -3642,13 +3774,18 @@ static void decon_update_regs(struct decon_device *decon, struct decon_reg_data 
 #endif /* CONFIG_USE_VSYNC_SKIP */
 	char strace_str[20];
 
-#ifdef CONFIG_LCD_HMT
+#if defined(CONFIG_LCD_HMT) || defined(CONFIG_LCD_DOZE_MODE)
 	struct dsim_device *dsim = NULL;
 	if (decon->out_type == DECON_OUT_DSI)
 		dsim = container_of(decon->output_sd, struct dsim_device, sd);
 #endif
+
 	if( !decon->systrace_pid ) decon->systrace_pid = current->pid;
 	decon->tracing_mark_write( decon->systrace_pid, 'B', "decon_update_regs", 0 );
+#ifdef CONFIG_FB_DSU
+	if (!decon->id && decon->out_type == DECON_OUT_DSI)
+		mutex_lock(&decon->dsu_lock);
+#endif
 
 	decon->cur_frame_has_yuv = 0;
 
@@ -3726,7 +3863,6 @@ static void decon_update_regs(struct decon_device *decon, struct decon_reg_data 
 	        decon_wait_for_vsync(decon, VSYNC_TIMEOUT_MSEC);
 		decon->tracing_mark_write( decon->systrace_pid, 'E', "decon_update_regs", 0 );
 	        DISP_SS_EVENT_LOG(DISP_EVT_TE_WAIT_DONE, &decon->sd, ktime_set(0, 0));
-
 	        if (decon_reg_wait_for_update_timeout(decon->id, 300 * 1000) < 0) {
 		        decon_dump(decon);
 		        vpp_dump(decon);
@@ -3773,6 +3909,21 @@ static void decon_update_regs(struct decon_device *decon, struct decon_reg_data 
 	decon_vpp_stop(decon, false);
 	decon_set_qos(decon, regs, 1);
 	decon_curbuf_to_prev(decon, regs);
+#ifdef CONFIG_LCD_DOZE_MODE
+	if (decon->req_display_on) {
+		if(v4l2_subdev_call(decon->output_sd, core, ioctl, DSIM_IOC_PKT_GO_DISABLE, NULL))
+			decon_err("Failed to disable Packet-go in %s\n", __func__);
+		call_panel_ops(dsim, displayon, dsim);
+		decon->req_display_on = 0;
+		if(v4l2_subdev_call(decon->output_sd, core, ioctl, DSIM_IOC_PKT_GO_ENABLE, NULL))
+			decon_err("Failed to enable Packet-go in %s\n", __func__);
+	}
+#endif
+
+#ifdef CONFIG_FB_DSU
+	if (!decon->id && decon->out_type == DECON_OUT_DSI)
+		mutex_unlock(&decon->dsu_lock);
+#endif
 }
 
 static void decon_update_regs_handler(struct kthread_work *work)
@@ -3798,6 +3949,33 @@ static void decon_update_regs_handler(struct kthread_work *work)
 		SYSTRACE_C_MARK( "update_regs_list", --decon->update_regs_list_cnt);
 		kfree(data);
 	}
+}
+
+static int decon_validate_dma_mapping(struct decon_device *decon,
+		struct decon_win_config *win_config)
+{
+
+	int i;
+	struct decon_win_config *config;
+	if (decon->id)
+		return true;
+
+	for (i = 0; i < decon->pdata->max_win; i++) {
+		config = &win_config[i];
+		if (config->state != DECON_WIN_STATE_BUFFER)
+			continue;
+
+		if (config->idma_type == IDMA_G2) {
+			if (i != 6) {
+				decon_err("%s: IDMA2 is mapped to %d\n", __func__, i);
+				return false;
+			}
+		} else if (i == 6) {
+			decon_err("%s: %d is mapped to win[6]\n", __func__, config->idma_type);
+			return false;
+		}
+	}
+	return true;
 }
 
 static void decon_set_smart_dma_mapping(struct decon_device *decon,
@@ -3875,6 +4053,166 @@ static void decon_set_smart_dma_mapping(struct decon_device *decon,
 	return;
 }
 
+
+#ifdef CONFIG_FB_DSU
+static void decon_change_lcdinfo_by_DSU( struct decon_device *decon, int DSU_mode )
+{
+	struct dsim_device *dsim = NULL;
+	dsim = container_of(decon->output_sd, struct dsim_device, sd);
+
+	if(DSU_mode != DECON_DSU_RES_DEFAULT) {
+			decon->lcd_info->xres = decon->DSU_rect.w;
+			decon->lcd_info->yres = decon->DSU_rect.h;
+	} else {
+		switch( DSU_mode ) {
+		case DECON_DSU_RES_WQHD:
+			decon->lcd_info->xres = 1440;
+			decon->lcd_info->yres = 2560;
+			break;
+		case DECON_DSU_RES_FHD:
+			decon->lcd_info->xres = 1080;
+			decon->lcd_info->yres = 1920;
+			break;
+		case DECON_DSU_RES_HD:
+			decon->lcd_info->xres = 720;
+			decon->lcd_info->yres = 1280;
+			break;
+		default:
+			pr_err( "%s: unknown case %d(%d,%d).\n", __func__, DSU_mode, decon->DSU_rect.w, decon->DSU_rect.h );
+		break;
+		}
+	}
+
+	dsim->dsu_xres = decon->lcd_info->xres;
+	dsim->dsu_yres = decon->lcd_info->yres;
+
+	pr_info( "%s: DSU_mode=%d, (%d,%d)\n", __func__, DSU_mode, decon->lcd_info->xres, decon->lcd_info->yres );
+}
+
+static void decon_dsu_handler(struct decon_device *decon)
+{
+	int ret;
+	bool loop_out;
+	const bool display_off_in_dsu = false;
+
+	s64 start_time;
+
+	decon_info("++ %s\n", __func__ );
+	start_time = ktime_to_ms(ktime_get());
+
+#ifdef CONFIG_FB_DSU_NOT_SEAMLESS
+	decon->dsu_lock_cnt = 2;
+	/* 1 frame delay after Display-off : change of PPS is showing at once. therefore, PPS change must be next frame of display-off */
+	v4l2_subdev_call(decon->output_sd, core, ioctl, DSIM_IOC_DISPLAY_ONOFF, (void*) 0);
+	usleep_range(17000, 17000);
+#endif
+
+	loop_out = false;
+	while( !loop_out ) {
+		pr_info( "%s.%d : need_DSU_update=%d\n", __func__, __LINE__, decon->need_DSU_update );
+		switch( decon->need_DSU_update ) {
+
+		case DECON_DSU_MIC_CMD:
+			// decon_reg_wait_linecnt_is_zero_timeout(decon->id, 0, 35 * 1000);
+
+			if( display_off_in_dsu) v4l2_subdev_call(decon->output_sd, core, ioctl, DSIM_IOC_DISPLAY_ONOFF, (void*) 0);
+			v4l2_subdev_call(decon->output_sd, core, ioctl, DSIM_IOC_DSU_CMD, (void*) decon);
+
+			if( display_off_in_dsu ) decon->need_DSU_update = DECON_DSU_DISPLAY_ON;
+			else decon->need_DSU_update = DECON_DSU_DONE;
+			loop_out = true;
+		break;
+		default:
+			pr_err( "%s.%d : UNKNOWN\n", __func__, __LINE__ );
+			loop_out = true;
+		break;
+		}
+	};
+
+	loop_out = false;
+	while( !loop_out ) {
+		pr_info( "%s.%d : need_DSU_update=%d\n", __func__, __LINE__, decon->need_DSU_update );
+		switch( decon->need_DSU_update ) {
+
+		case DECON_DSU_TE_ON:
+	//		msleep(20); // 1 frame
+			ret = v4l2_subdev_call(decon->output_sd, core, ioctl, DSIM_IOC_TE_ONOFF, (void*) 1);
+
+			if( display_off_in_dsu ) decon->need_DSU_update = DECON_DSU_DISPLAY_ON;
+			else {
+				decon->need_DSU_update = DECON_DSU_DONE;
+				loop_out = true;
+			}
+		break;
+		case DECON_DSU_DISPLAY_ON:
+			ret = v4l2_subdev_call(decon->output_sd, core, ioctl, DSIM_IOC_DISPLAY_ONOFF, (void*) 1);
+
+			decon->need_DSU_update = DECON_DSU_DONE;
+			loop_out = true;
+		break;
+		case DECON_DSU_DONE:
+			loop_out = true;
+		break;
+		default:
+			pr_err( "%s.%d : UNKNOWN\n", __func__, __LINE__ );
+			loop_out = true;
+		break;
+		}
+	};
+
+	decon_lpd_unblock(decon);
+	decon_info( "%s : %llums\n", __func__, ktime_to_ms(ktime_get()) -start_time );
+
+	return;
+}
+
+static int decon_dsu_change( struct decon_device *decon, struct decon_win_config *update_config )
+{
+	decon->is_DSU_mic = decon->lcd_info->mic_enabled;
+	decon->is_DSU_dsc = !decon->is_DSU_mic;		/* DSC is never used in exynos7420	*/
+
+	decon->need_DSU_update = (decon->is_DSU_mic ? DECON_DSU_MIC_CMD : DECON_DSU_DONE );
+	pr_info( "%s.%d : need_DSU_update = %d, dsc=%d, mic=%d\n", __func__, __LINE__, decon->need_DSU_update, decon->is_DSU_dsc, decon->is_DSU_mic );
+
+	decon->DSU_mode = update_config->enableDSU;
+	if(decon->DSU_mode != DECON_DSU_RES_DEFAULT) {
+		decon->DSU_x_delta = update_config->dst.x;
+		decon->DSU_y_delta = update_config->top;
+
+		decon->DSU_rect.x = update_config->left;
+		decon->DSU_rect.y = update_config->top;
+		decon->DSU_rect.w = update_config->right - update_config->left;
+		decon->DSU_rect.h = update_config->bottom - update_config->top;
+	}
+	decon_change_lcdinfo_by_DSU( decon, decon->DSU_mode );
+
+	/* disable LPD */
+	decon_lpd_block_exit(decon);
+	flush_workqueue(decon->lpd_wq);
+
+	pr_info( "DSU %s.%d : DSU_mode=%d, lcd_info (%d,%d)\n", __func__, __LINE__, decon->DSU_mode, decon->lcd_info->xres, decon->lcd_info->yres );
+
+	return 0;
+}
+
+static int decon_is_all_window_empty( struct decon_device *decon, struct decon_win_config_data *win_data )
+{
+	struct decon_win_config *win_config = win_data->config;
+	int i;
+	bool is_empty;
+
+	is_empty = true;
+	for( i = 0; i < decon->pdata->max_win && is_empty; i ++ ) {
+		if( win_config[i].dst.x || win_config[i].dst.y || win_config[i].dst.w || win_config[i].dst.h ||
+			win_config[i].src.x || win_config[i].src.y || win_config[i].src.w || win_config[i].src.h ) is_empty = false;
+	}
+
+	if(is_empty) pr_info( "decon : window size for DSU checked.\n" );
+
+	return is_empty;
+}
+#endif
+
 static int decon_set_win_config(struct decon_device *decon,
 		struct decon_win_config_data *win_data)
 {
@@ -3887,6 +4225,10 @@ static int decon_set_win_config(struct decon_device *decon,
 	int fd;
 	unsigned int bw = 0;
 	int plane_cnt = 0;
+#ifdef CONFIG_FB_DSU
+	struct decon_win_config *update_config;
+	static int cnt_after_dsu_changed = -1; // not triggered = -1, else is triggered;
+#endif
 
 #ifdef CONFIG_LCD_ALPM
 	struct dsim_device *dsim = NULL;
@@ -3900,6 +4242,40 @@ static int decon_set_win_config(struct decon_device *decon,
 		return fd;
 
 	mutex_lock(&decon->output_lock);
+
+#ifdef CONFIG_FB_DSU
+	decon_store_window_rect_log( decon, win_data );
+	if( cnt_after_dsu_changed >= 0 ) {
+		pr_info( "%s\n", decon_last_window_rect_log() );
+		if( ++cnt_after_dsu_changed > 5 ) cnt_after_dsu_changed = -1; // remove trigger
+	}
+
+	if( decon->dsu_lock_cnt > 0  ) {
+		decon->dsu_lock_cnt--;
+		if( decon->dsu_lock_cnt == 0 ) {
+#ifdef CONFIG_FB_DSU_NOT_SEAMLESS
+			v4l2_subdev_call(decon->output_sd, core, ioctl, DSIM_IOC_DISPLAY_ONOFF, (void*) 1);
+#endif
+		}
+	}
+
+	update_config = &win_config[DECON_WIN_UPDATE_IDX];
+	if( !decon_is_all_window_empty(decon, win_data) && (update_config->enableDSU != decon->DSU_mode ))
+	{
+		decon_print_bufered_window_rect_log();
+		cnt_after_dsu_changed = 0; // trigger
+
+		if (!decon->id && decon->out_type == DECON_OUT_DSI) {
+			pr_info( "%s.%d : lock : dsu_lock\n", __func__, __LINE__ );
+			mutex_lock(&decon->dsu_lock);
+		}
+		decon_dsu_change( decon, update_config );
+		if (!decon->id && decon->out_type == DECON_OUT_DSI) {
+			mutex_unlock(&decon->dsu_lock);
+			pr_info( "%s.%d : lock : dsu_unlock\n", __func__, __LINE__ );
+		}
+	}
+#endif	// CONFIG_FB_DSU
 
 	if ((decon->state == DECON_STATE_OFF) || (decon->ignore_vsync == true) ||
 		(decon->out_type == DECON_OUT_TUI)) {
@@ -3938,6 +4314,31 @@ static int decon_set_win_config(struct decon_device *decon,
 		}
 	}
 #endif
+#ifdef CONFIG_LCD_DOZE_MODE
+	if ((decon->out_type == DECON_OUT_DSI) &&
+		(decon->decon_doze == DECON_DOZE_STATE_DOZE)) {
+		for (i = 0; i < decon->pdata->max_win && !ret; i++) {
+			struct decon_win_config *config = &win_config[i];
+			if (config->state != 0) {
+				goto windows_config;
+			}
+		}
+		decon->timeline_max++;
+		pt = sw_sync_pt_create(decon->timeline, decon->timeline_max);
+		fence = sync_fence_create("display", pt);
+		sync_fence_install(fence, fd);
+		win_data->fence = fd;
+
+		sw_sync_timeline_inc(decon->timeline, 1);
+		goto err;
+	}
+windows_config:
+#endif
+	if (!decon_validate_dma_mapping(decon, win_config)) {
+		decon_err("%s: IDMA2 wrong mapping\n", __func__);
+		ret = -ENOMEM;
+		goto err;
+	}
 
 	regs = kzalloc(sizeof(struct decon_reg_data), GFP_KERNEL);
 	if (!regs) {
@@ -4086,6 +4487,211 @@ err:
 	return ret;
 }
 
+#ifdef CONFIG_LCD_DOZE_MODE
+int decon_doze_enable(struct decon_device *decon)
+{
+	struct decon_psr_info psr;
+	struct decon_init_param p;
+	struct irq_desc *desc;
+	int ret = 0;
+	unsigned int te_pending = 0;
+
+	decon_info("enable doze decon-%d\n", decon->id);
+	exynos_ss_printk("%s:state %d: active %d:+\n", __func__,
+				decon->state, pm_runtime_active(decon->dev));
+
+	mutex_lock(&decon->output_lock);
+
+	if (decon->state == DECON_STATE_ON) {
+		if (decon->decon_doze != DECON_DOZE_STATE_DOZE) {
+			ret = v4l2_subdev_call(decon->output_sd, video, s_stream, DSIM_REQ_DOZE_MODE);
+			if (ret) {
+				decon_err("starting stream failed for %s\n", decon->output_sd->name);
+				goto exit_doze_enable;
+			}
+			decon->decon_doze = DECON_DOZE_STATE_DOZE;
+		}
+		goto exit_doze_enable;
+	}
+
+#if defined(CONFIG_PM_RUNTIME)
+	pm_runtime_get_sync(decon->dev);
+#else
+	decon_runtime_resume(decon->dev);
+#endif
+
+	if (decon->out_type == DECON_OUT_DSI) {
+		decon->force_fullupdate = 0;
+		pm_stay_awake(decon->dev);
+		dev_warn(decon->dev, "pm_stay_awake");
+
+		ret = v4l2_subdev_call(decon->output_sd, video, s_stream, DSIM_REQ_DOZE_MODE);
+		if (ret) {
+			decon_err("starting stream failed for %s\n",
+					decon->output_sd->name);
+			goto exit_doze_enable;
+		}
+	}
+
+	ret = iovmm_activate(decon->dev);
+	if (ret < 0) {
+		decon_err("failed to reactivate vmm\n");
+		goto exit_doze_enable;
+	}
+	ret = 0;
+
+	if (decon->id == 0)
+		decon_set_sysreg_disp_cfg(decon);
+
+	decon_to_init_param(decon, &p);
+	decon_reg_init(decon->id, decon->pdata->dsi_mode, &p);
+
+#if defined(CONFIG_EXYNOS_DECON_MDNIE)
+	if (!decon->id)
+		mdnie_reg_start(decon->lcd_info->xres, decon->lcd_info->yres);
+#endif
+
+	decon_to_psr_info(decon, &psr);
+
+	if ((decon->decon_doze == DECON_DOZE_STATE_NORMAL) ||
+			(decon->decon_doze == DECON_DOZE_STATE_SUSPEND)) {
+		decon_reg_start(decon->id, decon->pdata->dsi_mode, &psr);
+	}
+
+#ifdef CONFIG_DECON_MIPI_DSI_PKTGO
+	if (decon->id == 0) {
+		ret = v4l2_subdev_call(decon->output_sd, core, ioctl, DSIM_IOC_PKT_GO_ENABLE, NULL);
+		if (ret)
+			decon_err("Failed to call DSIM packet go enable!\n");
+	}
+#endif
+
+#ifdef CONFIG_FB_WINDOW_UPDATE
+	if ((decon->pdata->out_type == DECON_OUT_DSI) && (decon->need_update)) {
+		decon->need_update = false;
+		decon->update_win.x = 0;
+		decon->update_win.y = 0;
+		decon->update_win.w = decon->lcd_info->xres;
+		decon->update_win.h = decon->lcd_info->yres;
+	}
+#endif
+	if (decon->id == 0)
+		decon_esd_enable_interrupt(decon);
+
+	if (!decon->id && !decon->eint_status) {
+		if (decon->eint_pend) {
+			te_pending = readl(decon->eint_pend);
+			writel(te_pending | decon->eint_pend_mask, decon->eint_pend);
+			desc = irq_to_desc(decon->irq);
+			desc->istate &= ~IRQS_PENDING;
+		}
+		enable_irq(decon->irq);
+		DISP_SS_EVENT_LOG(DISP_EVT_GIC_TE_ENABLE, &decon->sd, ktime_set(0, 0));
+		decon->eint_status = 1;
+	}
+
+	decon->state = DECON_STATE_ON;
+	decon->decon_doze = DECON_DOZE_STATE_DOZE;
+	decon->req_display_on = 1;
+
+	decon_reg_set_int(decon->id, &psr, decon->pdata->dsi_mode, 1);
+
+exit_doze_enable:
+	exynos_ss_printk("%s:state %d: active %d:-\n", __func__,
+				decon->state, pm_runtime_active(decon->dev));
+
+	mutex_unlock(&decon->output_lock);
+	return ret;
+}
+
+int decon_doze_suspend(struct decon_device *decon)
+{
+	struct decon_psr_info psr;
+	int ret = 0;
+	struct esd_protect *esd = &decon->esd;
+
+	decon_info("doze suspend decon-%d\n", decon->id);
+	exynos_ss_printk("disable decon-%d, state(%d) cnt %d\n", decon->id,
+				decon->state, pm_runtime_active(decon->dev));
+
+	if (decon->id == 0) {
+		if (esd->esd_wq) {
+			decon_esd_disable_interrupt(decon);
+			flush_workqueue(esd->esd_wq);
+		}
+	}
+
+	mutex_lock(&decon->output_lock);
+
+	if (decon->state == DECON_STATE_OFF) {
+		decon_info("decon%d already disabled\n", decon->id);
+		ret = -EEXIST;
+		goto err;
+	}
+	flush_kthread_worker(&decon->update_regs_worker);
+
+	decon_to_psr_info(decon, &psr);
+	decon_reg_set_int(decon->id, &psr, decon->pdata->dsi_mode, 0);
+
+	if (decon->id == 0 && (decon->vsync_info.irq_refcount <= 0) && decon->eint_status) {
+		disable_irq(decon->irq);
+		decon->eint_status = 0;
+	}
+
+	decon_to_psr_info(decon, &psr);
+	decon_reg_stop(decon->id, decon->pdata->dsi_mode, &psr);
+	decon_reg_clear_int(decon->id);
+
+	iovmm_deactivate(decon->dev);
+
+	/* DMA protection disable must be happen on vpp domain is alive */
+	if (psr.out_type == DECON_OUT_DSI) {
+		decon_set_protected_content(decon, NULL);
+		decon->vpp_usage_bitmask = 0;
+		decon_vpp_stop(decon, true);
+	}
+
+#if defined(CONFIG_EXYNOS_DECON_MDNIE)
+	if (!decon->id)
+		mdnie_reg_stop();
+#endif
+
+#if defined(CONFIG_PM_RUNTIME)
+	pm_runtime_put_sync(decon->dev);
+#else
+	decon_runtime_suspend(decon->dev);
+#endif
+
+	if (psr.out_type == DECON_OUT_DSI) {
+#if 1
+		/* stop output device (mipi-dsi or hdmi) */
+		ret = v4l2_subdev_call(decon->output_sd, video, s_stream, DSIM_REQ_DOZE_SUSPEND);
+		if (ret) {
+			decon_err("stopping stream failed for %s\n",
+					decon->output_sd->name);
+			goto err;
+		}
+#endif
+	}
+	if (psr.out_type == DECON_OUT_DSI) {
+		pm_relax(decon->dev);
+		dev_warn(decon->dev, "pm_relax");
+	}
+
+	decon->state = DECON_STATE_OFF;
+	decon->decon_doze = DECON_DOZE_STATE_DOZE_SUSPEND;
+err:
+	exynos_ss_printk("%s:state %d: active%d:-\n", __func__,
+				decon->state, pm_runtime_active(decon->dev));
+
+	mutex_unlock(&decon->output_lock);
+
+	return ret;
+}
+
+
+#endif
+
 static ssize_t decon_fb_read(struct fb_info *info, char __user *buf,
 		size_t count, loff_t *ppos)
 {
@@ -4107,7 +4713,9 @@ static int decon_ioctl(struct fb_info *info, unsigned int cmd,
 
 	int ret = 0;
 	u32 crtc;
-
+#ifdef CONFIG_LCD_DOZE_MODE
+	u32 pwr_mode;
+#endif
 	int systrace_cnt = 0;
 
 	SYSTRACE_C_MARK( "decon_ioctl", ++systrace_cnt );
@@ -4227,7 +4835,43 @@ static int decon_ioctl(struct fb_info *info, unsigned int cmd,
 
 		ret = decon_set_hdmi_config(decon, &decon->ioctl_data.hdmi_data);
 		break;
-
+#ifdef CONFIG_LCD_DOZE_MODE
+	case S3CFB_POWER_MODE:
+		if (get_user(pwr_mode, (int __user *)arg)) {
+			ret = -EFAULT;
+			break;
+		}
+		decon_info("%s : pwr mode : %d\n", __func__, pwr_mode);
+		switch (pwr_mode) {
+			case DECON_POWER_MODE_DOZE :
+				decon_info("%s DOZE MODE \n", __func__);
+				if (decon->vsync_backup == true)
+					decon->ignore_vsync = false;
+				ret = decon_doze_enable(decon);
+				if (ret) {
+					decon_err("ERR:%s:failed to decon_doze_enable():%d\n", __func__, ret);
+					ret = 0;
+				}
+				break;
+			case DECON_POWER_MODE_DOZE_SUSPEND :
+				decon_info("%s DOZE SUSPEND MODE \n", __func__);
+				if (decon->ignore_vsync == false) {
+					decon->ignore_vsync = true;
+					decon->vsync_backup = true;
+				}
+				ret = decon_doze_suspend(decon);
+				if (ret) {
+					decon_err("ERR:%s:failed to decon_doze_suspend():%d\n", __func__, ret);
+					if (decon->vsync_backup == true) {
+						decon->ignore_vsync = false;
+						decon->vsync_backup = false;
+					}
+					ret = 0;
+				}
+				break;
+		}
+		break;
+#endif
 	default:
 		ret = -ENOTTY;
 	}
@@ -4973,13 +5617,15 @@ static int decon_esd_panel_reset(struct decon_device *decon)
 
 	if (decon->pdata->psr_mode == DECON_MIPI_COMMAND_MODE)
 		decon->ignore_vsync = false;
-
+#ifdef CONFIG_FB_WINDOW_UPDATE
 	decon->need_update = true;
 	decon->update_win.x = 0;
 	decon->update_win.y = 0;
 	decon->update_win.w = decon->lcd_info->xres;
 	decon->update_win.h = decon->lcd_info->yres;
+#endif
 	decon->force_fullupdate = 1;
+
 #if 0
 	if (decon->pdata->trig_mode == DECON_HW_TRIG)
 		decon_reg_set_trigger(decon->id, decon->pdata->dsi_mode,
@@ -5409,13 +6055,11 @@ static int decon_probe(struct platform_device *pdev)
 	if (ret) {
 		decon_err("failed to create ops_ctrl sysfs\n");
 	}
-
 	ret = iovmm_activate(decon->dev);
 	if (ret < 0) {
 		decon_err("failed to reactivate vmm\n");
 		goto fail_ion_create;
 	}
-
 	/* register internal and external DECON as entity */
 	ret = decon_register_entity(decon);
 	if (ret)
@@ -5464,6 +6108,15 @@ static int decon_probe(struct platform_device *pdev)
 	/* systrace */
 	decon->systrace_pid = 0;
 	decon->tracing_mark_write = tracing_mark_write;
+
+#ifdef CONFIG_FB_DSU
+	if (!decon->id && decon->out_type == DECON_OUT_DSI) {
+		decon->DSU_mode = DECON_DSU_RES_DEFAULT;
+		decon->need_DSU_update = 0;
+		decon->dsu_lock_cnt = 0;
+		mutex_init(&decon->dsu_lock);
+	}
+#endif
 
 	/* init work thread for update registers */
 	INIT_LIST_HEAD(&decon->update_regs_list);
@@ -5558,11 +6211,13 @@ static int decon_probe(struct platform_device *pdev)
 					decon->pdata->trig_mode, DECON_TRIG_ENABLE);
 
 		dsim = container_of(decon->output_sd, struct dsim_device, sd);
+		dsim->decon = (void *)decon;
 		call_panel_ops(dsim, displayon, dsim);
 
 decon_init_done:
+		decon->int_fifo_status = false;
 		decon->ignore_vsync = false;
-
+		decon->disp_ss_log_level = DISP_EVENT_LEVEL_HIGH;
 		if ((decon->id == 0)  && (decon->pdata->psr_mode == DECON_MIPI_COMMAND_MODE)) {
 			if (dsim == NULL)
 				dsim = container_of(decon->output_sd, struct dsim_device, sd);
@@ -5571,6 +6226,7 @@ decon_init_done:
 				panel = &dsim->priv;
 				if ((panel) && (!panel->lcdConnected)) {
 					decon->ignore_vsync = true;
+					ret = v4l2_subdev_call(decon->output_sd, core, ioctl, DSIM_IOC_LCD_OFF, NULL);
 					dsim_info("decon does not found panel activate vsync ignore\n");
 					goto decon_rest_init;
 				}
@@ -5602,6 +6258,9 @@ decon_rest_init:
 			if (ret)
 				decon_err("Failed to call DSIM packet go enable in %s!\n", __func__);
 		}
+#endif
+#ifdef CONFIG_LCD_DOZE_MODE
+		decon->decon_doze = DECON_DOZE_STATE_NORMAL;
 #endif
 		decon->state = DECON_STATE_ON;
 		/* [W/A] prevent sleep enter during LCD on */
@@ -5688,6 +6347,10 @@ decon_rest_init:
 fail_output_lock:
 	mutex_destroy(&decon->output_lock);
 	mutex_destroy(&decon->mutex);
+#ifdef CONFIG_FB_DSU
+	if (!decon->id && decon->out_type == DECON_OUT_DSI)
+		mutex_destroy(&decon->dsu_lock);
+#endif
 
 fail_entity:
 	decon_unregister_entity(decon);
@@ -5732,7 +6395,6 @@ static int decon_remove(struct platform_device *pdev)
 
 	pm_runtime_disable(dev);
 	decon_put_clocks(decon);
-
 	iovmm_deactivate(dev);
 	unregister_framebuffer(decon->windows[0]->fbinfo);
 
@@ -5743,7 +6405,6 @@ static int decon_remove(struct platform_device *pdev)
 		decon_release_windows(decon->windows[i]);
 
 	debugfs_remove_recursive(decon->debug_root);
-	kfree(decon);
 
 	decon_info("remove sucessful\n");
 	return 0;
@@ -5789,6 +6450,7 @@ static struct platform_driver decon_driver __refdata = {
 		.owner	= THIS_MODULE,
 		.pm	= &decon_pm_ops,
 		.of_match_table = of_match_ptr(decon_device_table),
+		.suppress_bind_attrs = true,
 	}
 };
 

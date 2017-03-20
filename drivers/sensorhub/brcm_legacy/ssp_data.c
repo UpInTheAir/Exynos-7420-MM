@@ -635,12 +635,13 @@ int parse_dataframe(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 	struct sensor_value sensorsdata;
 	struct ssp_time_diff sensortime;
 	s16 caldata[3] = { 0, };
-
+    char msg_inst = 0;
+    
 	sensortime.time_diff = 0;
 	data->uIrqCnt++;
 
 	for (iDataIdx = 0; iDataIdx < iLength;) {
-		switch (pchRcvDataFrame[iDataIdx++]) {
+		switch (msg_inst = pchRcvDataFrame[iDataIdx++]) {
 		case MSG2AP_INST_BYPASS_DATA:
 			iSensorData = pchRcvDataFrame[iDataIdx++];
 			if ((iSensorData < 0) || (iSensorData >= SENSOR_MAX)) {
@@ -690,6 +691,8 @@ int parse_dataframe(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 			}
 
 			do {
+                if(data->get_sensor_data[iSensorData] == NULL)
+                    goto error_return;
 				data->get_sensor_data[iSensorData](pchRcvDataFrame, &iDataIdx, &sensorsdata);
 				get_timestamp(data, pchRcvDataFrame, &iDataIdx, &sensorsdata, &sensortime, iSensorData);
 				//pr_err("[SSP]: %s - sensor %d result timestamp %lld\n", __func__,iSensorData,sensorsdata.timestamp);
@@ -699,7 +702,7 @@ int parse_dataframe(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 				else if ((iSensorData == PROXIMITY_SENSOR) || (iSensorData == PROXIMITY_RAW)
 						|| (iSensorData == GESTURE_SENSOR) || (iSensorData == SIG_MOTION_SENSOR)
 						|| (iSensorData == STEP_COUNTER)   || (iSensorData == STEP_DETECTOR)
-						|| (iSensorData == TILT_DETECTOR))
+						|| (iSensorData == TILT_DETECTOR) || (iSensorData == PICKUP_GESTURE))
 					data->report_sensor_data[iSensorData](data, &sensorsdata);
 				else
 					pr_err("[SSP]: %s irq_diff is under 1msec (%d)\n", __func__, iSensorData);
@@ -733,6 +736,15 @@ int parse_dataframe(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 		case MSG2AP_INST_META_DATA:
 			sensorsdata.meta_data.what = pchRcvDataFrame[iDataIdx++];
 			sensorsdata.meta_data.sensor = pchRcvDataFrame[iDataIdx++];
+            
+            if(sensorsdata.meta_data.what != 1)
+                goto error_return;
+            
+        	if ((sensorsdata.meta_data.sensor < 0) || (sensorsdata.meta_data.sensor >= SENSOR_MAX)) {
+			pr_err("[SSP]: %s - Mcu meta_data frame1 error %d\n", __func__,
+					sensorsdata.meta_data.sensor);
+			return ERROR;
+			}
 			report_meta_data(data, &sensorsdata);
 			break;
 		case MSG2AP_INST_TIME_SYNC:
@@ -749,10 +761,25 @@ int parse_dataframe(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 		case SH_MSG2AP_GYRO_CALIBRATION_EVENT_OCCUR:
 			data->gyro_lib_state = GYRO_CALIBRATION_STATE_EVENT_OCCUR;
 			break;
+        default :
+                goto error_return;
 		}
 	}
-
+	if(data->pktErrCnt >= 1) // if input error packet doesn't comes continually, do not reset
+	data->pktErrCnt = 0;
 	return SUCCESS;
+    
+error_return:
+    pr_err("[SSP] %s err Inst 0x%02x\n", __func__, msg_inst);
+    data->pktErrCnt++;
+    if(data->pktErrCnt >= 2)
+    {
+    	pr_err("[SSP] %s packet is polluted\n", __func__);
+    	data->mcuAbnormal = true;
+    	data->pktErrCnt = 0; 
+    	data->errorCount++;
+    }
+    return ERROR;  
 }
 
 void initialize_function_pointer(struct ssp_data *data)

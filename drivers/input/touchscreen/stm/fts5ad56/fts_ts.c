@@ -926,7 +926,6 @@ static int fts_init(struct fts_ts_info *info)
 	info->wirelesscharger_mode = false;
 	info->lowpower_mode = false;
 	info->lowpower_flag = 0x00;
-	info->fts_power_state = 0;
 
 #ifdef FTS_SUPPORT_TOUCH_KEY
 	info->tsp_keystatus = 0x00;
@@ -2107,6 +2106,7 @@ static int fts_probe(struct i2c_client *client, const struct i2c_device_id *idp)
 
 	if (info->board->power)
 		info->board->power(info, true);
+	info->fts_power_state = FTS_POWER_STATE_ACTIVE;
 
 	info->dev = &info->client->dev;
 	info->input_dev = input_allocate_device();
@@ -2622,6 +2622,13 @@ static void fts_reinit(struct fts_ts_info *info)
 	fts_set_noise_param(info);
 #endif
 
+	if (strncmp(info->board->model_name, "G928", 4) == 0) {
+		unsigned char regAdd[4] = {0xB0, 0x02, 0xC2, 0x02};
+		fts_write_reg(info, &regAdd[0], 4);
+		fts_delay(30);
+		tsp_debug_info(true, &info->client->dev, "FTS sending disable metal plate detect event for Zero2\n");
+	}
+
 	fts_command(info, SLEEPOUT);
 	fts_delay(50);
 
@@ -2920,7 +2927,7 @@ static int fts_start_device(struct fts_ts_info *info)
 
 	mutex_lock(&info->device_mutex);
 
-	if (!info->touch_stopped && !info->lowpower_mode) {
+	if (info->fts_power_state == FTS_POWER_STATE_ACTIVE) {
 		tsp_debug_err(true, &info->client->dev, "%s already power on\n", __func__);
 		goto out;
 	}
@@ -2930,11 +2937,7 @@ static int fts_start_device(struct fts_ts_info *info)
 	fts_release_all_key(info);
 #endif
 
-	if (info->lowpower_mode) {
-		/* low power mode command is sent after LCD OFF. turn on touch power @ LCD ON */
-		if (info->touch_stopped)
-			goto tsp_power_on;
-
+	if (info->fts_power_state == FTS_POWER_STATE_LOWPOWER) {
 		disable_irq(info->irq);
 
 		info->reinit_done = false;
@@ -2946,7 +2949,6 @@ static int fts_start_device(struct fts_ts_info *info)
 		if (device_may_wakeup(&info->client->dev))
 			disable_irq_wake(info->irq);
 	} else {
-tsp_power_on:
 		if (info->board->power)
 			info->board->power(info, true);
 		info->touch_stopped = false;

@@ -24,6 +24,18 @@
 	#address-cells = <1>;
 	#size-cells = <1>;
 
+	arm-pmu {
+		compatible = "arm,armv8-pmuv3";
+		interrupts = <0 32 4>,
+			     <0 33 4>,
+			     <0 34 4>,
+			     <0 35 4>,
+			     <0 56 4>,
+			     <0 57 4>,
+			     <0 58 4>,
+			     <0 59 4>;
+	};
+
 	aliases {
 		pinctrl0 = &pinctrl_0;
 		pinctrl1 = &pinctrl_1;
@@ -36,6 +48,7 @@
 		pinctrl8 = &pinctrl_8;
 		pinctrl9 = &pinctrl_9;
 		mshc0 = &dwmmc_0;
+		mshc1 = &dwmmc_1;
 		mshc2 = &dwmmc_2;
 		mdev0 = &mdev_0;
 		vpp0 = &vg_0;
@@ -52,7 +65,7 @@
 		uart4 = &serial_4;
 		hsi2c0 = &hsi2c_0;
 		hsi2c1 = &hsi2c_1;
-		hsi2c2 = &hsi2c_2;
+                hsi2c2 = &hsi2c_2;
 		hsi2c3 = &hsi2c_3;
 		hsi2c4 = &hsi2c_4;
 		hsi2c5 = &hsi2c_5;
@@ -992,6 +1005,17 @@
 		status = "disabled";
 	};
 
+	dwmmc_1: dwmmc1@15750000 {
+		compatible = "samsung,exynos7420-dw-mshc";
+		reg = <0x15750000 0x2000>;
+		interrupts = <0 202 0>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clocks = <&clock 180>, <&clock 187>, <&clock 186>;
+		clock-names = "biu", "dout_mmc_a", "gate_ciu";
+		status = "disabled";
+	 };
+
 	dwmmc_2: dwmmc2@15560000 {
 		compatible = "samsung,exynos7420-dw-mshc";
 		reg = <0x15560000 0x2000>;
@@ -1104,6 +1128,7 @@
         compatible = "arm,mali";
         reg = <0x14AC0000 0x5000>;
         interrupts = <0 241 0>, <0 242 0>, <0 240 0>;
+        interrupt-names = "JOB", "MMU", "GPU";
         clocks = <&clock 1>, <&clock 10>, <&clock 160>, <&clock 161>, <&clock 162>, <&clock 163>, <&clock 300>, <&clock 301>;
         clock-names = "fin_pll", "fout_g3d_pll", "aclk_g3d", "dout_aclk_g3d", "mout_g3d", "sclk_hpm_g3d", "aclk_lh_g3d0", "aclk_lh_g3d1";
         samsung,power-domain = <&pd_g3d>;

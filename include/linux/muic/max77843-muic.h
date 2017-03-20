@@ -25,6 +25,9 @@
 #ifndef __MAX77843_MUIC_H__
 #define __MAX77843_MUIC_H__
 
+#include <linux/muic/muic.h>
+#include <linux/muic/max77843-muic-hv-typedef.h>
+
 #define MUIC_DEV_NAME			"muic-max77843"
 
 /* muic chip specific internal data structure */
@@ -298,6 +301,6 @@ enum {
 #endif
 
 extern struct device *switch_device;
-
+extern int muic_afc_set_voltage(int vol);
 #endif /* __MAX77843_MUIC_H__ */
 

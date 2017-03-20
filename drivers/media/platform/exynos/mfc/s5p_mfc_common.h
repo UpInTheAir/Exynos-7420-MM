@@ -37,7 +37,7 @@
 #include <linux/pm_qos.h>
 #endif
 
-#define MFC_DRIVER_INFO		150902
+#define MFC_DRIVER_INFO		161116
 
 #define MFC_MAX_BUFFERS		32
 #define MFC_MAX_REF_BUFS	2
@@ -49,15 +49,15 @@
 #define MFC_NUM_CONTEXTS	32
 #define MFC_MAX_DRM_CTX		2
 /* Interrupt timeout */
-#define MFC_INT_TIMEOUT		2000
+#define MFC_INT_TIMEOUT		15000
 /* Interrupt short timeout */
-#define MFC_INT_SHORT_TIMEOUT	800
+#define MFC_INT_SHORT_TIMEOUT	3000
 /* Busy wait timeout */
 #define MFC_BW_TIMEOUT		500
 /* Watchdog interval */
 #define MFC_WATCHDOG_INTERVAL   1000
 /* After how many executions watchdog should assume lock up */
-#define MFC_WATCHDOG_CNT        3
+#define MFC_WATCHDOG_CNT        15
 
 #define MFC_NO_INSTANCE_SET	-1
 
@@ -73,6 +73,7 @@
 #define MFC_BASE_MASK		((1 << 17) - 1)
 
 #define FLAG_LAST_FRAME		0x80000000
+#define FLAG_CSD		0x20000000
 #define MFC_MAX_INTERVAL	(2 * USEC_PER_SEC)
 
 /* Maximum number of temporal layers */
@@ -141,6 +142,8 @@ enum s5p_mfc_inst_state {
 	MFCINST_ABORT_INST,
 	MFCINST_DPB_FLUSHING,
 	MFCINST_VPS_PARSED_ONLY,
+	MFCINST_SPECIAL_PARSING,
+	MFCINST_SPECIAL_PARSING_NAL,
 };
 
 /**
@@ -357,6 +360,7 @@ struct s5p_mfc_dev {
 	int curr_ctx;
 	int preempt_ctx;
 	unsigned long ctx_work_bits;
+	unsigned long ctx_stop_bits;
 
 	atomic_t watchdog_cnt;
 	atomic_t watchdog_run;
@@ -463,7 +467,8 @@ struct s5p_mfc_h264_enc_params {
 	u32 aso_slice_order[8];
 
 	u32 prepend_sps_pps_to_idr;
-	u32 enable_ltr;
+	u8 enable_ltr;
+	u8 num_of_ltr;
 	u32 set_priority;
 	u32 base_priority;
 	u32 vui_enable;
@@ -605,6 +610,7 @@ struct s5p_mfc_enc_params {
 	enum v4l2_mpeg_video_header_mode seq_hdr_mode;
 	enum v4l2_mpeg_mfc51_video_frame_skip_mode frame_skip_mode;
 	u8 fixed_target_bit;
+	u8 num_hier_max_layer;
 
 	u16 rc_frame_delta;	/* MFC6.1 Only */
 
@@ -757,7 +763,7 @@ struct s5p_mfc_raw_info {
 	int plane_size[3];
 };
 
-#define MFC_TIME_INDEX		8
+#define MFC_TIME_INDEX		15
 struct mfc_timestamp {
 	struct list_head list;
 	struct timeval timestamp;
@@ -1142,8 +1148,13 @@ static inline unsigned int mfc_version(struct s5p_mfc_dev *dev)
 	  (ctx->state == MFCINST_RUNNING)) &&	\
 	 test_bit(ctx->num, &ctx->dev->hw_lock))
 #define need_to_wait_nal_abort(ctx)		 \
-	(((ctx->state == MFCINST_ABORT_INST)) && \
-	 test_bit(ctx->num, &ctx->dev->hw_lock))
+	(ctx->state == MFCINST_ABORT_INST)
+#define need_to_special_parsing(ctx)		\
+	((ctx->state == MFCINST_GOT_INST) ||	\
+	 (ctx->state == MFCINST_HEAD_PARSED))
+#define need_to_special_parsing_nal(ctx)	\
+	((ctx->state == MFCINST_RUNNING) ||	\
+	 (ctx->state == MFCINST_ABORT))
 
 /* Extra information for Decoder */
 #define	DEC_SET_DUAL_DPB		(1 << 0)
@@ -1174,8 +1185,11 @@ static inline int clear_hw_bit(struct s5p_mfc_ctx *ctx)
 	struct s5p_mfc_dev *dev = ctx->dev;
 	int ret = -1;
 
-	if (!atomic_read(&dev->watchdog_run))
+	if (!atomic_read(&dev->watchdog_run)) {
 		ret = test_and_clear_bit(ctx->num, &dev->hw_lock);
+		/* Reset the timeout watchdog */
+		atomic_set(&dev->watchdog_cnt, 0);
+	}
 
 	return ret;
 }

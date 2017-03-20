@@ -396,7 +396,14 @@ exit:
 		break;
 	case HUB2AP_WRITE:
 		{
-		char* buffer = (char*) kzalloc(chLength, GFP_KERNEL);
+		char* buffer;
+		if(chLength == 0)
+		{
+			pr_err("[SSP] %s chlength is zero\n", __func__);
+			iRet = -EINVAL;
+			break;
+		}
+		buffer = (char*) kzalloc(chLength, GFP_KERNEL);
 		if (buffer == NULL) {
 			pr_err("[SSP] %s, failed to alloc memory for buffer\n", __func__);
 			iRet = -ENOMEM;

@@ -148,6 +148,13 @@ config MUIC_MAX77833_SHAKEID_WA
         help
           If you say yes here you will get support for the MAX77833 MUIC SHAKE ID WA.
 
+config MUIC_MAX77833_NOT_SUPPORT_WCIN
+	bool "Using MAX77833 MUIC do not support WCIN"
+	depends on MUIC_MAX77833
+	default n
+	help
+	  If you say yes here you will get do not support function for WCIN in the MAX77833 MUIC.
+
 config MUIC_MAX77888
 	bool "Using MAX77888 MUIC"
 	depends on MFD_MAX77888 && USE_MUIC
@@ -163,13 +170,6 @@ config MUIC_S2MM001
 	help
 	  If you say yes here you will get support for
 	  for the S2MM001 MUIC chip.
-
-config MUIC_HV_FORCE_LIMIT
-        bool "Force limit AFC QC MAX CHG VOLTAGE"
-        depends on HV_MUIC_MAX77843_AFC
-        default n
-        help
-          If you say yes here you will add function of limit afc charging volatage.
 
 config MUIC_DET_JACK
 	bool "Using MAX77843 MUIC EARJACK"

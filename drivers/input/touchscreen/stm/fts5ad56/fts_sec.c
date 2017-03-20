@@ -4316,16 +4316,6 @@ static void spay_enable(void *device_data)
 	char buff[CMD_STR_LEN] = { 0 };
 	unsigned char string_pi[16];
 
-	if (info->touch_stopped) {
-		tsp_debug_info(true, &info->client->dev, "%s: [ERROR] Touch is stopped\n", __func__);
-
-		snprintf(buff, sizeof(buff), "%s", "TSP turned off");
-
-		set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
-		info->cmd_state = CMD_STATUS_NOT_APPLICABLE;
-		goto out;
-	}
-
 	set_default_result(info);
 
 	if (info->cmd_param[0]) {

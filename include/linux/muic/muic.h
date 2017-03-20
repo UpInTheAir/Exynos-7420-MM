@@ -58,12 +58,10 @@ enum {
 	MUIC_PATH_AUDIO,
 };
 
-#ifdef CONFIG_MUIC_HV_FORCE_LIMIT
 enum {
 	HV_9V = 0,
 	HV_5V,
 };
-#endif
 
 /* bootparam SWITCH_SEL */
 enum {
@@ -189,16 +187,6 @@ typedef enum {
 	ATTACHED_DEV_NUM,
 } muic_attached_dev_t;
 
-#ifdef CONFIG_MUIC_HV_FORCE_LIMIT
-/* MUIC attached device type */
-typedef enum {
-	SILENT_CHG_DONE = 0,
-	SILENT_CHG_CHANGING = 1,
-
-	SILENT_CHG_NUM,
-} muic_silent_change_state_t;
-#endif
-
 
 /* muic common callback driver internal data structure
  * that setted at muic-core.c file
@@ -218,9 +206,12 @@ struct muic_platform_data {
 	bool afc_disable;
 	bool wireless;
 
-#ifdef CONFIG_MUIC_HV_FORCE_LIMIT
 	int hv_sel;
-	int silent_chg_change_state;
+
+#ifdef CONFIG_MUIC_MAX77833
+	struct max77833_muic_data *pmuic_data;
+	bool afc_attached;
+	bool qc_attached;
 #endif
 
 	/* muic switch dev register function for DockObserver */

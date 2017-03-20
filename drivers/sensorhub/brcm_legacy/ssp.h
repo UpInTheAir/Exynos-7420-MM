@@ -740,8 +740,10 @@ struct ssp_data {
 	int acc_type;
 	int gyro_lib_state;
 
-	atomic_t int_gyro_enable;
 	char sensor_state[SENSOR_MAX + 1];
+    unsigned int errorCount;
+    unsigned int pktErrCnt;
+	bool mcuAbnormal;
 };
 
 struct ssp_big {

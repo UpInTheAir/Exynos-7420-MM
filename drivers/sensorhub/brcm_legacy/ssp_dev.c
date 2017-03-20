@@ -158,6 +158,9 @@ static void initialize_variable(struct ssp_data *data)
 	data->resumeTimestamp = 0;
 	data->bIsResumed = false;
 	initialize_function_pointer(data);
+    data->errorCount = 0;
+    data->pktErrCnt = 0;
+	data->mcuAbnormal = false;
 }
 
 int initialize_mcu(struct ssp_data *data)

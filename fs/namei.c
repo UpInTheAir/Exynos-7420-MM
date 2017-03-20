@@ -3382,8 +3382,10 @@ static long do_rmdir(int dfd, const char __user *pathname)
 	struct dentry *dentry;
 	struct nameidata nd;
 	unsigned int lookup_flags = 0;
+#if ANDROID_VERSION >= 60000
 	char *path_buf = NULL;
 	char *propagate_path = NULL;
+#endif
 retry:
 	name = user_path_parent(dfd, pathname, &nd, lookup_flags);
 	if (IS_ERR(name))
@@ -3418,15 +3420,18 @@ retry:
 	error = security_path_rmdir(&nd.path, dentry);
 	if (error)
 		goto exit3;
+#if ANDROID_VERSION >= 60000
 	if (nd.path.dentry->d_sb->s_op->unlink_callback) {
 		path_buf = kmalloc(PATH_MAX, GFP_KERNEL);
 		propagate_path = dentry_path_raw(dentry, path_buf, PATH_MAX);
 	}
+#endif
 	error = vfs_rmdir(nd.path.dentry->d_inode, dentry);
 exit3:
 	dput(dentry);
 exit2:
 	mutex_unlock(&nd.path.dentry->d_inode->i_mutex);
+#if ANDROID_VERSION >= 60000
 	if (path_buf && !error) {
 		nd.path.dentry->d_sb->s_op->unlink_callback(nd.path.dentry->d_sb,
 			propagate_path);
@@ -3435,6 +3440,7 @@ exit2:
 		kfree(path_buf);
 		path_buf = NULL;
 	}
+#endif
 	mnt_drop_write(nd.path.mnt);
 exit1:
 	path_put(&nd.path);
@@ -3497,8 +3503,10 @@ static long do_unlinkat(int dfd, const char __user *pathname)
 	struct nameidata nd;
 	struct inode *inode = NULL;
 	unsigned int lookup_flags = 0;
+#if ANDROID_VERSION >= 60000
 	char *path_buf = NULL;
 	char *propagate_path = NULL;
+#endif
 retry:
 	name = user_path_parent(dfd, pathname, &nd, lookup_flags);
 	if (IS_ERR(name))
@@ -3523,10 +3531,12 @@ retry:
 		inode = dentry->d_inode;
 		if (!inode)
 			goto slashes;
+#if ANDROID_VERSION >= 60000
 		if (inode->i_sb->s_op->unlink_callback) {
 			path_buf = kmalloc(PATH_MAX, GFP_KERNEL);
 			propagate_path = dentry_path_raw(dentry, path_buf, PATH_MAX);
 		}
+#endif
 		ihold(inode);
 		error = security_path_unlink(&nd.path, dentry);
 		if (error)
@@ -3536,6 +3546,7 @@ exit2:
 		dput(dentry);
 	}
 	mutex_unlock(&nd.path.dentry->d_inode->i_mutex);
+#if ANDROID_VERSION >= 60000
 	if (path_buf && !error) {
 		inode->i_sb->s_op->unlink_callback(inode->i_sb, propagate_path);
 	}
@@ -3543,6 +3554,7 @@ exit2:
 		kfree(path_buf);
 		path_buf = NULL;
 	}
+#endif
 	if (inode)
 		iput(inode);	/* truncate the inode here */
 	mnt_drop_write(nd.path.mnt);

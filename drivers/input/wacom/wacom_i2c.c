@@ -452,7 +452,7 @@ static void pen_insert_work(struct work_struct *work)
 
 	wac_i2c->pen_insert = !gpio_get_value(wac_i2c->pdata->gpios[I_SENSE]);
 
-	printk(KERN_DEBUG "epen:%s : %d\n",
+	printk(KERN_DEBUG "epen:%s  dw 1s: %d\n",
 		__func__, wac_i2c->pen_insert);
 
 	input_report_switch(wac_i2c->input_dev,
@@ -471,7 +471,7 @@ static irqreturn_t wacom_pen_detect(int irq, void *dev_id)
 	struct wacom_i2c *wac_i2c = dev_id;
 
 	cancel_delayed_work_sync(&wac_i2c->pen_insert_dwork);
-	wake_lock_timeout(&wac_i2c->det_wakelock, HZ / 10);
+	wake_lock_timeout(&wac_i2c->det_wakelock, 1000);
 	schedule_delayed_work(&wac_i2c->pen_insert_dwork, HZ / 20);
 	return IRQ_HANDLED;
 }

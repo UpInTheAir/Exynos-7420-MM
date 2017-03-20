@@ -813,9 +813,11 @@ struct ssp_data {
 
 #if defined (CONFIG_SENSORS_SSP_VLTE)
 	int accel_sub_position;
-#endif		
-	atomic_t int_gyro_enable;
+#endif
 	char sensor_state[SENSOR_MAX + 1];
+	unsigned int errorCount;
+    unsigned int pktErrCnt;
+	bool mcuAbnormal;
 };
 
 struct ssp_big {

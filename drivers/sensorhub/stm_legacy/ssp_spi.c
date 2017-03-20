@@ -212,6 +212,12 @@ exit:
 		mutex_unlock(&data->pending_mutex);
 		break;
 	case HUB2AP_WRITE:
+		if(chLength == 0)
+		{
+			ssp_errf("chlength is zero");
+			iRet = -EINVAL;
+			break;
+		}
 		buffer = kzalloc(chLength, GFP_KERNEL);
 		if (buffer == NULL) {
 			ssp_errf("failed to alloc memory for buffer");

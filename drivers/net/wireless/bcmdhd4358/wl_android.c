@@ -1,7 +1,7 @@
 /*
  * Linux cfg80211 driver - Android related functions
  *
- * Copyright (C) 1999-2015, Broadcom Corporation
+ * Copyright (C) 1999-2017, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_android.c 602973 2015-11-30 12:36:21Z $
+ * $Id: wl_android.c 675121 2016-12-14 08:07:58Z $
  */
 
 #include <linux/module.h>
@@ -76,6 +76,7 @@
 #define CMD_BTCOEXMODE		"BTCOEXMODE"
 #define CMD_SETSUSPENDOPT	"SETSUSPENDOPT"
 #define CMD_SETSUSPENDMODE      "SETSUSPENDMODE"
+#define CMD_MAXDTIM_IN_SUSPEND  "MAX_DTIM_IN_SUSPEND"
 #define CMD_P2P_DEV_ADDR	"P2P_DEV_ADDR"
 #define CMD_SETFWPATH		"SETFWPATH"
 #define CMD_SETBAND		"SETBAND"
@@ -300,7 +301,9 @@ static u8 miracast_cur_mode;
 #ifdef DHD_LOG_DUMP
 #define CMD_NEW_DEBUG_PRINT_DUMP			"DEBUG_DUMP"
 extern void dhd_schedule_log_dump(dhd_pub_t *dhdp);
+#ifdef DHD_DEBUG
 extern int dhd_bus_mem_dump(dhd_pub_t *dhd);
+#endif /* DHD_DEBUG */
 #endif /* DHD_LOG_DUMP */
 #ifdef DHD_TRACE_WAKE_LOCK
 extern void dhd_wk_lock_stats_dump(dhd_pub_t *dhdp);
@@ -493,11 +496,19 @@ static int wl_android_get_rssi(struct net_device *net, char *command, int total_
 		return -1;
 	if ((ssid.SSID_len == 0) || (ssid.SSID_len > DOT11_MAX_SSID_LEN)) {
 		DHD_ERROR(("%s: wldev_get_ssid failed\n", __FUNCTION__));
+	} else if (total_len <= ssid.SSID_len) {
+		return -ENOMEM;
 	} else {
 		memcpy(command, ssid.SSID, ssid.SSID_len);
 		bytes_written = ssid.SSID_len;
 	}
-	bytes_written += snprintf(&command[bytes_written], total_len, " rssi %d", rssi);
+
+	if ((total_len - bytes_written) < (strlen(" rssi -XXX") + 1))
+		return -ENOMEM;
+
+	bytes_written += scnprintf(&command[bytes_written], total_len - bytes_written,
+		" rssi %d", rssi);
+	command[bytes_written] = '\0';
 	DHD_INFO(("%s: command result is %s (%d)\n", __FUNCTION__, command, bytes_written));
 	return bytes_written;
 }
@@ -546,6 +557,23 @@ static int wl_android_set_suspendmode(struct net_device *dev, char *command, int
 	else
 		DHD_ERROR(("%s: failed %d\n", __FUNCTION__, ret));
 #endif
+
+	return ret;
+}
+
+static int wl_android_set_max_dtim(struct net_device *dev, char *command, int total_len)
+{
+	int ret = 0;
+	int dtim_flag;
+
+	dtim_flag = *(command + strlen(CMD_MAXDTIM_IN_SUSPEND) + 1) - '0';
+
+	if (!(ret = net_os_set_max_dtim_enable(dev, dtim_flag))) {
+		DHD_TRACE(("%s: use Max bcn_li_dtim in suspend %s\n",
+			__FUNCTION__, (dtim_flag ? "Enable" : "Disable")));
+	} else {
+		DHD_ERROR(("%s: failed %d\n", __FUNCTION__, ret));
+	}
 
 	return ret;
 }
@@ -864,7 +892,9 @@ int wl_android_set_scan_channel_time(struct net_device *dev, char *command, int 
 		DHD_ERROR(("%s: Failed to get Parameter\n", __FUNCTION__));
 		return -1;
 	}
-
+#ifdef CUSTOMER_SCAN_TIMEOUT_SETTING
+	wl_cfg80211_custom_scan_time(WL_CUSTOM_SCAN_CHANNEL_TIME, time);
+#endif /* CUSTOMER_SCAN_TIMEOUT_SETTING */
 	error = wldev_ioctl(dev, WLC_SET_SCAN_CHANNEL_TIME, &time, sizeof(time), 1);
 	if (error) {
 		DHD_ERROR(("%s: Failed to set Scan Channel Time %d, error = %d\n",
@@ -901,6 +931,9 @@ int wl_android_set_scan_home_time(struct net_device *dev, char *command, int tot
 		DHD_ERROR(("%s: Failed to get Parameter\n", __FUNCTION__));
 		return -1;
 	}
+#ifdef CUSTOMER_SCAN_TIMEOUT_SETTING
+	wl_cfg80211_custom_scan_time(WL_CUSTOM_SCAN_HOME_TIME, time);
+#endif /* CUSTOMER_SCAN_TIMEOUT_SETTING */
 
 	error = wldev_ioctl(dev, WLC_SET_SCAN_HOME_TIME, &time, sizeof(time), 1);
 	if (error) {
@@ -939,6 +972,9 @@ int wl_android_set_scan_home_away_time(struct net_device *dev, char *command, in
 		DHD_ERROR(("%s: Failed to get Parameter\n", __FUNCTION__));
 		return -1;
 	}
+#ifdef CUSTOMER_SCAN_TIMEOUT_SETTING
+	wl_cfg80211_custom_scan_time(WL_CUSTOM_SCAN_HOME_AWAY_TIME, time);
+#endif /* CUSTOMER_SCAN_TIMEOUT_SETTING */
 
 	error = wldev_iovar_setint(dev, "scan_home_away_time", time);
 	if (error) {
@@ -1051,7 +1087,7 @@ wl_android_set_join_prefer(struct net_device *dev, char *command, int total_len)
 	char *pcmd;
 	int total_len_left;
 	int i;
-	char hex[2];
+	char hex[] = "XX";
 
 	pcmd = command + strlen(CMD_SETJOINPREFER) + 1;
 	total_len_left = strlen(pcmd);
@@ -1531,9 +1567,8 @@ wls_parse_batching_cmd(struct net_device *dev, char *command, int total_len)
 					" <> params\n", __FUNCTION__));
 					goto exit;
 				}
-
-				while ((token2 = strsep(&pos2, PNO_PARAM_CHANNEL_DELIMETER))
-						!= NULL) {
+				while ((token2 = strsep(&pos2,
+						PNO_PARAM_CHANNEL_DELIMETER)) != NULL) {
 					if (token2 == NULL || !*token2)
 						break;
 					if (*token2 == '\0')
@@ -1545,7 +1580,7 @@ wls_parse_batching_cmd(struct net_device *dev, char *command, int total_len)
 							(*token2 == 'A')? "A" : "B"));
 					} else {
 						if ((batch_params.nchan >= WL_NUMCHANNELS) ||
-						    	(i >= WL_NUMCHANNELS)) {
+							(i >= WL_NUMCHANNELS)) {
 							DHD_ERROR(("Too many nchan %d\n",
 								batch_params.nchan));
 							err = BCME_BUFTOOSHORT;
@@ -3260,11 +3295,11 @@ int wl_android_set_ibss_routetable(struct net_device *dev, char *command, int to
 		err = -EINVAL;
 		goto exit;
 	}
-        if (entries > MAX_IBSS_ROUTE_TBL_ENTRY) {
-                WL_ERR(("Invalid entries number %u\n", entries));
-                err = -EINVAL;
-                goto exit;
-        }
+	if (entries > MAX_IBSS_ROUTE_TBL_ENTRY) {
+		WL_ERR(("Invalid entries number %u\n", entries));
+		err = -EINVAL;
+		goto exit;
+	}
 
 	WL_INFORM(("Routing table count:%u\n", entries));
 	route_tbl->num_entry = entries;
@@ -3639,10 +3674,12 @@ static int wl_android_get_link_status(struct net_device *dev, char *command,
 int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 {
 #define PRIVATE_COMMAND_MAX_LEN	8192
+#define PRIVATE_COMMAND_DEF_LEN	4096
 	int ret = 0;
 	char *command = NULL;
 	int bytes_written = 0;
 	android_wifi_priv_cmd priv_cmd;
+	int buf_size = 0;
 
 	net_os_wake_lock(net);
 
@@ -3677,11 +3714,14 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		}
 	}
 	if ((priv_cmd.total_len > PRIVATE_COMMAND_MAX_LEN) || (priv_cmd.total_len < 0)) {
-		DHD_ERROR(("%s: too long priavte command\n", __FUNCTION__));
+		DHD_ERROR(("%s: buf length invalid:%d\n", __FUNCTION__,
+			priv_cmd.total_len));
 		ret = -EINVAL;
 		goto exit;
 	}
-	command = kmalloc((priv_cmd.total_len + 1), GFP_KERNEL);
+
+	buf_size = max(priv_cmd.total_len, PRIVATE_COMMAND_DEF_LEN);
+	command = kmalloc((buf_size + 1), GFP_KERNEL);
 	if (!command)
 	{
 		DHD_ERROR(("%s: failed to allocate memory\n", __FUNCTION__));
@@ -3777,6 +3817,9 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	else if (strnicmp(command, CMD_SETSUSPENDMODE, strlen(CMD_SETSUSPENDMODE)) == 0) {
 		bytes_written = wl_android_set_suspendmode(net, command, priv_cmd.total_len);
 	}
+	else if (strnicmp(command, CMD_MAXDTIM_IN_SUSPEND, strlen(CMD_MAXDTIM_IN_SUSPEND)) == 0) {
+		bytes_written = wl_android_set_max_dtim(net, command, priv_cmd.total_len);
+	}
 	else if (strnicmp(command, CMD_SETBAND, strlen(CMD_SETBAND)) == 0) {
 		uint band = *(command + strlen(CMD_SETBAND) + 1) - '0';
 #ifdef WL_HOST_BAND_MGMT
@@ -3808,6 +3851,13 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	/* CUSTOMER_SET_COUNTRY feature is define for only GGSM model */
 	else if (strnicmp(command, CMD_COUNTRY, strlen(CMD_COUNTRY)) == 0) {
 		char *country_code = command + strlen(CMD_COUNTRY) + 1;
+		struct wireless_dev *wdev = ndev_to_wdev(net);
+		struct wiphy *wiphy = wdev->wiphy;
+
+		if (wl_check_dongle_idle(wiphy) != TRUE) {
+			DHD_ERROR(("FW is busy to check dongle idle\n"));
+			goto exit;
+		}
 		bytes_written = wldev_set_country(net, country_code, true, true);
 #ifdef FCC_PWR_LIMIT_2G
 		if (wldev_iovar_setint(net, "fccpwrlimit2g", FALSE)) {
@@ -4230,19 +4280,19 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 #endif /* DHD_LOG_DUMP */
 	else {
 		DHD_ERROR(("Unknown PRIVATE command %s - ignored\n", command));
-		snprintf(command, 3, "OK");
-		bytes_written = strlen("OK");
+		bytes_written = scnprintf(command, sizeof("FAIL"), "FAIL");
 	}
 
 	if (bytes_written >= 0) {
 		if ((bytes_written == 0) && (priv_cmd.total_len > 0))
 			command[0] = '\0';
 		if (bytes_written >= priv_cmd.total_len) {
-			DHD_ERROR(("%s: bytes_written = %d\n", __FUNCTION__, bytes_written));
-			bytes_written = priv_cmd.total_len;
-		} else {
-			bytes_written++;
+			DHD_ERROR(("%s: err. bytes_written:%d >= buf_size:%d \n",
+				__FUNCTION__, bytes_written, buf_size));
+			ret = BCME_BUFTOOSHORT;
+			goto exit;
 		}
+		bytes_written++;
 		priv_cmd.used_len = bytes_written;
 		if (copy_to_user(priv_cmd.buf, command, bytes_written)) {
 			DHD_ERROR(("%s: failed to copy data to user buffer\n", __FUNCTION__));
@@ -4255,9 +4305,7 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 
 exit:
 	net_os_wake_unlock(net);
-	if (command) {
-		kfree(command);
-	}
+	kfree(command);
 
 	return ret;
 }

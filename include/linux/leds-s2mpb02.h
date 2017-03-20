@@ -40,6 +40,8 @@
 #define S2MPB02_FLED_CTRL1_LV_ENABLE 1
 #define S2MPB02_FLED_CTRL1_LV_DISABLE 0
 
+#define TORCH_STEP 10
+
 enum s2mpb02_led_id {
 	S2MPB02_FLASH_LED_1,
 	S2MPB02_TORCH_LED_1,
@@ -128,9 +130,12 @@ enum s2mpb02_torch_timeout {
 struct s2mpb02_led {
 	const char *name;
 	int id;
+	int init_brightness;
 	int brightness;
 	int timeout;
 	int irda_off;
+	int torch_table_enable;
+	int torch_table[TORCH_STEP];
 };
 
 struct s2mpb02_led_platform_data {

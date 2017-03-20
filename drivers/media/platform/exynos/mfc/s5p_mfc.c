@@ -170,11 +170,11 @@ int exynos_mfc_sysmmu_fault_handler(struct iommu_domain *iodmn, struct device *d
 #define COL_FRAME_RATE		0
 #define COL_FRAME_INTERVAL	1
 static unsigned long framerate_table[][2] = {
-       { 30000, 25000 },
-       { 60000, 12500 },
-       { 120000, 6940 },
-       { 180000, 4860 },
-       { 240000, 0 },
+	{ 30000, 25000 },
+	{ 60000, 12500 },
+	{ 120000, 6940 },
+	{ 180000, 4860 },
+	{ 240000, 0 },
 };
 
 static inline unsigned long timeval_diff(struct timeval *to,
@@ -281,7 +281,7 @@ int get_framerate_by_timestamp(struct s5p_mfc_ctx *ctx, struct v4l2_buffer *buf)
 
 	if (list_empty(&ctx->ts_list)) {
 		dec_add_timestamp(ctx, buf, &ctx->ts_list);
-        return get_framerate_by_interval(0);		
+		return get_framerate_by_interval(0);
 	} else {
 		found = 0;
 		list_for_each_entry_reverse(temp_ts, &ctx->ts_list, list) {
@@ -324,6 +324,12 @@ int get_framerate_by_timestamp(struct s5p_mfc_ctx *ctx, struct v4l2_buffer *buf)
 	} else if (debug_ts == 2) {
 		mfc_info_ctx("Min interval = %d, It is %d fps\n",
 				min_interval, max_framerate);
+	}
+
+	if (!ctx->ts_is_full) {
+		if (debug_ts == 1)
+			mfc_info_ctx("ts doesn't full, keep %d fps\n", ctx->framerate);
+		return ctx->framerate;
 	}
 
 	return max_framerate;
@@ -1446,9 +1452,23 @@ static void s5p_mfc_handle_frame(struct s5p_mfc_ctx *ctx,
 	/* All frames remaining in the buffer have been extracted  */
 	if (dst_frame_status == S5P_FIMV_DEC_STATUS_DECODING_EMPTY) {
 		if (ctx->state == MFCINST_RES_CHANGE_FLUSH) {
+			struct mfc_timestamp *temp_ts = NULL;
+
 			mfc_debug(2, "Last frame received after resolution change.\n");
 			s5p_mfc_handle_frame_all_extracted(ctx);
 			ctx->state = MFCINST_RES_CHANGE_END;
+
+			/* empty the timestamp queue */
+			while (!list_empty(&ctx->ts_list)) {
+				temp_ts = list_entry((&ctx->ts_list)->next,
+						struct mfc_timestamp, list);
+				list_del(&temp_ts->list);
+			}
+			ctx->ts_count = 0;
+			ctx->ts_is_full = 0;
+			ctx->last_framerate = 0;
+			ctx->framerate = DEC_MAX_FPS;
+
 			goto leave_handle_frame;
 		} else {
 			s5p_mfc_handle_frame_all_extracted(ctx);
@@ -1684,6 +1704,26 @@ static inline void s5p_mfc_handle_error(struct s5p_mfc_ctx *ctx,
 	return;
 }
 
+static irqreturn_t s5p_mfc_top_half_irq(int irq, void *priv)
+{
+	struct s5p_mfc_dev *dev = priv;
+	struct s5p_mfc_ctx *ctx;
+	unsigned int err;
+	unsigned int reason;
+
+	ctx = dev->ctx[dev->curr_ctx];
+	if (!ctx)
+		mfc_err("no mfc context to run\n");
+
+	reason = s5p_mfc_get_int_reason();
+	err = s5p_mfc_get_int_err();
+	mfc_debug(2, "[c:%d] Int reason: %d (err: %d)\n",
+			dev->curr_ctx, reason, err);
+	MFC_TRACE_DEV("<< Int reason(top): %d\n", reason);
+
+	return IRQ_WAKE_THREAD;
+}
+
 /* Interrupt processing */
 static irqreturn_t s5p_mfc_irq(int irq, void *priv)
 {
@@ -1769,6 +1809,18 @@ static irqreturn_t s5p_mfc_irq(int irq, void *priv)
 	case S5P_FIMV_R2H_CMD_COMPLETE_SEQ_RET:
 	case S5P_FIMV_R2H_CMD_ENC_BUFFER_FULL_RET:
 		if (ctx->type == MFCINST_DECODER) {
+			if (ctx->state == MFCINST_SPECIAL_PARSING_NAL) {
+				s5p_mfc_clear_int_flags();
+				spin_lock_irq(&dev->condlock);
+				clear_bit(ctx->num, &dev->ctx_work_bits);
+				spin_unlock_irq(&dev->condlock);
+				ctx->state =  MFCINST_RUNNING;
+				if (clear_hw_bit(ctx) == 0)
+					BUG();
+				s5p_mfc_clock_off(dev);
+				wake_up_ctx(ctx, reason, err);
+				goto done;
+			}
 			s5p_mfc_handle_frame(ctx, reason, err);
 		} else if (ctx->type == MFCINST_ENCODER) {
 			if (reason == S5P_FIMV_R2H_CMD_SLICE_DONE_RET) {
@@ -2426,26 +2478,30 @@ static int s5p_mfc_release(struct file *file)
 	mfc_info_ctx("MFC driver release is called [%d:%d], is_drm(%d)\n",
 			dev->num_drm_inst, dev->num_inst, ctx->is_drm);
 
-	if (need_to_wait_frame_start(ctx)) {
-		ctx->state = MFCINST_ABORT;
-		if (s5p_mfc_wait_for_done_ctx(ctx,
-				S5P_FIMV_R2H_CMD_FRAME_DONE_RET))
-			s5p_mfc_cleanup_timeout(ctx);
-	}
+	spin_lock_irq(&dev->condlock);
+	set_bit(ctx->num, &dev->ctx_stop_bits);
+	clear_bit(ctx->num, &dev->ctx_work_bits);
+	spin_unlock_irq(&dev->condlock);
 
+	/* If a H/W operation is in progress, wait for it complete */
 	if (need_to_wait_nal_abort(ctx)) {
-		ctx->state = MFCINST_ABORT;
 		if (s5p_mfc_wait_for_done_ctx(ctx,
 				S5P_FIMV_R2H_CMD_NAL_ABORT_RET))
 			s5p_mfc_cleanup_timeout(ctx);
+	} else if (test_bit(ctx->num, &dev->hw_lock)) {
+		ret = wait_event_timeout(ctx->queue,
+				(test_bit(ctx->num, &dev->hw_lock) == 0),
+				msecs_to_jiffies(MFC_INT_TIMEOUT));
+		if (ret == 0)
+			mfc_err_ctx("wait for event failed\n");
 	}
 
 	if (ctx->type == MFCINST_ENCODER) {
 		enc = ctx->enc_priv;
 		if (!enc) {
 			mfc_err_ctx("no mfc encoder to run\n");
-			mutex_unlock(&dev->mfc_mutex);
-			return -EINVAL;
+			ret = -EINVAL;
+			goto err_release;
 		}
 
 		if (enc->in_slice || enc->buf_full) {
@@ -2502,77 +2558,36 @@ static int s5p_mfc_release(struct file *file)
 	if (!atomic_read(&dev->watchdog_run) &&
 		(ctx->inst_no != MFC_NO_INSTANCE_SET)) {
 		/* Wait for hw_lock == 0 for this context */
-		wait_event_timeout(ctx->queue,
-				(test_bit(ctx->num, &dev->hw_lock) == 0),
+		ret = wait_event_timeout(ctx->queue,
+				(dev->hw_lock == 0),
 				msecs_to_jiffies(MFC_INT_SHORT_TIMEOUT));
+		if (ret == 0) {
+			mfc_err_ctx("Waiting for hardware to finish timed out\n");
+			ret = -EBUSY;
+			goto err_release;
+		}
 
+		s5p_mfc_clean_ctx_int_flags(ctx);
 		ctx->state = MFCINST_RETURN_INST;
 		spin_lock_irq(&dev->condlock);
 		set_bit(ctx->num, &dev->ctx_work_bits);
 		spin_unlock_irq(&dev->condlock);
 
 		/* To issue the command 'CLOSE_INSTANCE' */
-		s5p_mfc_clean_ctx_int_flags(ctx);
 		s5p_mfc_try_run(dev);
 
 		/* Wait until instance is returned or timeout occured */
 		if (s5p_mfc_wait_for_done_ctx(ctx,
-				S5P_FIMV_R2H_CMD_CLOSE_INSTANCE_RET)) {
-			dev->curr_ctx_drm = ctx->is_drm;
-			set_bit(ctx->num, &dev->hw_lock);
-			s5p_mfc_clock_on(dev);
-			s5p_mfc_close_inst(ctx);
+				S5P_FIMV_R2H_CMD_CLOSE_INSTANCE_RET) == 1) {
+			mfc_err_ctx("It was expired to wait for a CLOSE_INSTANCE\n");
 			if (s5p_mfc_wait_for_done_ctx(ctx,
-				S5P_FIMV_R2H_CMD_CLOSE_INSTANCE_RET)) {
-				mfc_err_ctx("Abnormal h/w state.\n");
-
-				/* cleanup for the next open */
-				if (dev->curr_ctx == ctx->num)
-					clear_bit(ctx->num, &dev->hw_lock);
-				if (ctx->is_drm)
-					dev->num_drm_inst--;
-				dev->num_inst--;
-
-				mfc_info_dev("Failed to release MFC inst[%d:%d]\n",
-						dev->num_drm_inst, dev->num_inst);
-
-#ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
-				if (ctx->is_drm && dev->num_drm_inst == 0) {
-					ret = s5p_mfc_secmem_isolate_and_protect(0);
-					if (ret)
-						mfc_err("Failed to unprotect secure memory\n");
-				}
-#endif
-				if (dev->num_inst == 0) {
-					s5p_mfc_deinit_hw(dev);
-					del_timer_sync(&dev->watchdog_timer);
-
-					flush_workqueue(dev->sched_wq);
-
-					s5p_mfc_clock_off(dev);
-					mfc_debug(2, "power off\n");
-					s5p_mfc_power_off(dev);
-
-					s5p_mfc_release_dev_context_buffer(dev);
-					dev->drm_fw_status = 0;
-
-#ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
-					if (dev->is_support_smc) {
-						s5p_mfc_release_sec_pgtable(dev);
-						dev->is_support_smc = 0;
-					}
-#endif
-				} else {
-					s5p_mfc_clock_off(dev);
-				}
-
-
-				mutex_unlock(&dev->mfc_mutex);
-
-				return -EIO;
+					S5P_FIMV_R2H_CMD_CLOSE_INSTANCE_RET)) {
+				mfc_err_ctx("It was once more expired. stop H/W\n");
+				s5p_mfc_check_hw_state(dev);
+				/* Stop */
+				BUG();
 			}
 		}
-
 		ctx->inst_no = MFC_NO_INSTANCE_SET;
 	}
 	/* hardware locking scheme */
@@ -2630,6 +2645,11 @@ static int s5p_mfc_release(struct file *file)
 		enc_cleanup_user_shared_handle(ctx);
 		kfree(ctx->enc_priv);
 	}
+
+	spin_lock_irq(&dev->condlock);
+	clear_bit(ctx->num, &dev->ctx_stop_bits);
+	spin_unlock_irq(&dev->condlock);
+
 	dev->ctx[ctx->num] = 0;
 	kfree(ctx);
 
@@ -2639,6 +2659,15 @@ static int s5p_mfc_release(struct file *file)
 	mutex_unlock(&dev->mfc_mutex);
 
 	return 0;
+
+err_release:
+	spin_lock_irq(&dev->condlock);
+	clear_bit(ctx->num, &dev->ctx_stop_bits);
+	spin_unlock_irq(&dev->condlock);
+
+	mutex_unlock(&dev->mfc_mutex);
+
+	return ret;
 }
 
 /* Poll */
@@ -2928,8 +2957,8 @@ static int s5p_mfc_probe(struct platform_device *pdev)
 		goto err_res_irq;
 	}
 	dev->irq = res->start;
-	ret = request_threaded_irq(dev->irq, NULL, s5p_mfc_irq, IRQF_ONESHOT, pdev->name,
-									dev);
+	ret = request_threaded_irq(dev->irq, s5p_mfc_top_half_irq, s5p_mfc_irq,
+			IRQF_ONESHOT, pdev->name, dev);
 	if (ret != 0) {
 		dev_err(&pdev->dev, "failed to install irq (%d)\n", ret);
 		goto err_req_irq;
@@ -3489,6 +3518,7 @@ static struct platform_driver s5p_mfc_driver = {
 		.owner	= THIS_MODULE,
 		.pm	= &s5p_mfc_pm_ops,
 		.of_match_table = exynos_mfc_match,
+		.suppress_bind_attrs = true,
 	},
 };
 

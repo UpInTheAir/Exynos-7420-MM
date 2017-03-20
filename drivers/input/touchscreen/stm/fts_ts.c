@@ -748,7 +748,6 @@ static int fts_init(struct fts_ts_info *info)
 	info->deepsleep_mode = false;
 	info->lowpower_mode = false;
 	info->lowpower_flag = 0x00;
-	info->fts_power_state = 0;
 
 #ifdef FTS_SUPPORT_TOUCH_KEY
 	info->tsp_keystatus = 0x00;
@@ -1900,6 +1899,7 @@ static int fts_probe(struct i2c_client *client, const struct i2c_device_id *idp)
 
 	if (info->board->power)
 		info->board->power(info, true);
+	info->fts_power_state = FTS_POWER_STATE_ACTIVE;
 
 	info->dev = &info->client->dev;
 	info->input_dev = input_allocate_device();
@@ -2672,7 +2672,7 @@ static int fts_start_device(struct fts_ts_info *info)
 
 	mutex_lock(&info->device_mutex);
 
-	if (!info->touch_stopped && !info->lowpower_mode) {
+	if (info->fts_power_state == FTS_POWER_STATE_ACTIVE) {
 		tsp_debug_err(true, &info->client->dev, "%s already power on\n", __func__);
 		goto out;
 	}
@@ -2682,11 +2682,7 @@ static int fts_start_device(struct fts_ts_info *info)
 	fts_release_all_key(info);
 #endif
 
-	if (info->lowpower_mode) {
-		/* low power mode command is sent after LCD OFF. turn on touch power @ LCD ON */
-		if (info->touch_stopped)
-			goto tsp_power_on;
-
+	if (info->fts_power_state == FTS_POWER_STATE_LOWPOWER) {
 		disable_irq(info->irq);
 
 		info->reinit_done = false;
@@ -2698,7 +2694,6 @@ static int fts_start_device(struct fts_ts_info *info)
 		if (device_may_wakeup(&info->client->dev))
 			disable_irq_wake(info->irq);
 	} else {
-tsp_power_on:
 		if (info->board->power)
 			info->board->power(info, true);
 		info->touch_stopped = false;
@@ -2754,8 +2749,6 @@ static void fts_shutdown(struct i2c_client *client)
 void fts_recovery_cx(struct fts_ts_info *info)
 {
 	unsigned char regAdd[4] = {0};
-	unsigned char buf[8] = {0};
-	unsigned char cnt = 100;
 
 	regAdd[0] = 0xB6;
 	regAdd[1] = 0x00;
@@ -2764,26 +2757,10 @@ void fts_recovery_cx(struct fts_ts_info *info)
 	fts_write_reg(info,&regAdd[0], 4);		// Loading FW to PRAM  without CRC Check
 	fts_delay(30);
 
+	fts_command(info,SLEEPOUT);
+	fts_delay(30);
 
-	fts_command(info,CX_TUNNING);
-	fts_delay(300);
-
-	fts_command(info,FTS_CMD_SAVE_CX_TUNING);
-	fts_delay(200);
-
-	do
-	{
-		int ret;
-		regAdd[0] = READ_ONE_EVENT;
-		ret = fts_read_reg(info, regAdd, 1, &buf[0], FTS_EVENT_SIZE);
-
-		fts_delay(10);
-		if(cnt-- == 0) break;
-	}while(buf[0] != 0x16 || buf[1] != 0x04);
-
-
-	fts_command(info, SLEEPOUT);
-	fts_delay(50);
+	fts_execute_autotune(info);
 
 	fts_command(info, SENSEON);
 	fts_delay(50);

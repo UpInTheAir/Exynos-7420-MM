@@ -105,6 +105,26 @@ config ALWAYS_RELOAD_MTP_FACTORY_BUILD
 	depends on SEC_FACTORY
 	default n
 
+config CHECK_OCTA_CHIP_ID
+	bool "support to check octa chip id"
+	depends on SEC_FACTORY
+	default n
+
+config FB_DSU
+        bool "DECON DSU mode"
+        depends on FB_WINDOW_UPDATE
+        default n
+
+config FB_DSU_NOT_SEAMLESS
+        bool "LCD cannot sealmess while multi-resolution"
+        depends on FB_DSU
+        default n
+
+config FB_DSU_REG_LOCK
+        bool "Lock register while multi-resolution (only HF4)"
+        depends on FB_DSU
+        default n
+
 source "drivers/video/exynos/decon/vpp/Kconfig"
 
 endif

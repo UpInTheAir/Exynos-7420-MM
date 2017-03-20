@@ -86,6 +86,12 @@ static int muic_handle_dock_notification(struct notifier_block *nb,
 	const char *name;
 
 	switch (attached_dev) {
+#if defined(CONFIG_MUIC_MAX77833)
+	case ATTACHED_DEV_TIMEOUT_OPEN_MUIC:
+		if (action == MUIC_NOTIFY_CMD_DETACH)
+			return muic_dock_detach_notify();
+		break;
+#endif
 	case ATTACHED_DEV_DESKDOCK_MUIC:
 	case ATTACHED_DEV_DESKDOCK_VB_MUIC:
 #if defined(CONFIG_SEC_FACTORY)

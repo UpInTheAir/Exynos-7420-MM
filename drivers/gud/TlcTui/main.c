@@ -116,6 +116,25 @@ static long tui_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 		break;
 	}
 
+        case TUI_IO_DISPLAY_NOTIFY: {
+            struct tlc_tui_display_t response;
+            pr_info("TUI_IO_DISPLAY_NOTIFY\n");
+
+            /* Read user response */
+            if (copy_from_user(&response, uarg, sizeof(response)))
+                ret = -EFAULT;
+            else
+                ret = 0;
+
+            pr_info("IOCTL: User completed command w=%d, h=%d.\n", response.width, response.height);
+
+            ret = tlc_display_cmd(&response);
+			if(ret != 0)
+				return ret;
+			
+            break;
+        }
+
 	default:
 		pr_info("undefined!\n");
 		return -ENOTTY;

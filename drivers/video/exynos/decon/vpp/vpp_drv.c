@@ -1323,6 +1323,7 @@ static struct platform_driver vpp_driver __refdata = {
 		.owner	= THIS_MODULE,
 		.pm	= &vpp_pm_ops,
 		.of_match_table = of_match_ptr(vpp_device_table),
+		.suppress_bind_attrs = true,
 	}
 };
 

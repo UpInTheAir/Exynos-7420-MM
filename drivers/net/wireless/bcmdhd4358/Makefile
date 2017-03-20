@@ -55,10 +55,9 @@ ifeq ($(BUS_IFACE_PCIE),y)
 	DHDCFLAGS += -DDHD_PKTID_AUDIT_ENABLED
 	# Extended HANG event with reason codes
 	DHDCFALGS += -DDHD_USE_EXTENDED_HANG_REASON
-
+	# Enable wakelock for legacy scan
+	DHDCFLAGS += -DDHD_USE_SCAN_WAKELOCK
 endif
-
-
 
 #################
 # Common feature
@@ -66,6 +65,12 @@ endif
 
 DHDCFLAGS += -DCUSTOMER_HW4
 DHDCFLAGS += -DWL_CFG80211
+
+# DMA64 suppports on 64bit Architecture
+ifeq ($(CONFIG_64BIT),y)
+DHDCFLAGS := $(filter-out -DBCMDMA32,$(DHDCFLAGS))
+DHDCFLAGS += -DBCMDMA64OSL
+endif
 
 # Debug
 DHDCFLAGS += -DSIMPLE_MAC_PRINT
@@ -76,6 +81,8 @@ DHDCFLAGS += -DDHD_TRACE_WAKE_LOCK
 DHDCFLAGS += -DBCMASSERT_LOG
 # Collect Current Assoc/Reject Status for Big Data logging
 DHDCFLAGS += -DDHD_ENABLE_BIGDATA_LOGGING
+# Enable SI utility error log
+DHDCFLAGS += -DSI_ERROR_ENFORCE
 
 # Print 8021X
 DHDCFLAGS += -DDHD_8021X_DUMP
@@ -175,7 +182,8 @@ DHDCFLAGS += -DCONFIG_HAS_WAKELOCK
 # Used short dwell time during initial scan
 DHDCFLAGS += -DUSE_INITIAL_SHORT_DWELL_TIME
 
-# Japan ccode revision will be fixed by nvram's value
+# Korea and Japan ccode revision will be fixed by nvram's value
+DHDCFLAGS += -DKEEP_KR_REGREV
 DHDCFLAGS += -DKEEP_JP_REGREV
 
 # NAN feature
@@ -188,6 +196,34 @@ DHDCFLAGS += -DFCC_PWR_LIMIT_2G
 
 # WFA Certification feature
 DHDCFLAGS += -DUSE_WFA_CERT_CONF
+
+# Customer scan timeout setting
+DHDCFLAGS += -DCUSTOMER_SCAN_TIMEOUT_SETTING
+
+# Enable HANG event test private command
+DHDCFLAGS += -DSUPPORT_TRIGGER_HANG_EVENT
+
+# Android Version Check from Platform source
+CANDIDATE_VERSION_PATH := ./../../build/core ../../../../../../build/core out
+FOUND_VERSION_PATH := $(foreach dir,$(CANDIDATE_VERSION_PATH), $(wildcard $(dir)/version_defaults.mk))
+FOUND_VERSION_PATH := $(word 1, $(FOUND_VERSION_PATH))
+ifeq ($(FOUND_VERSION_PATH),)
+$(warning Not found Android version file. Set as Legacy mode)
+DHDCFLAGS += -DDHD_LEGACY_FILE_PATH
+DHDCFLAGS += -DDHD_DISABLE_ANDROID_FEATURE_SET
+else
+# Extract version string and get major number
+ANDROID_PLATFORM_VERSION := $(shell grep "PLATFORM_VERSION := " $(FOUND_VERSION_PATH) | cut -d "=" -f 2 | cut -d "." -f 1 | sed 's/ //g')
+$(warning Android Platform Version : $(ANDROID_PLATFORM_VERSION))
+# If Android version lower than 7(Nougat) => Use Legacy File path
+ifeq ($(shell expr $(ANDROID_PLATFORM_VERSION) \< 7),1)
+DHDCFLAGS += -DDHD_LEGACY_FILE_PATH
+DHDCFLAGS += -DDHD_DISABLE_ANDROID_FEATURE_SET
+$(warning Will be use Legacy file path)
+else
+DHDCFLAGS += -DDHD_SET_COUNTRY_SUPPORT
+endif
+endif
 
 ##############################
 # Android Platform Definition
@@ -206,25 +242,16 @@ DHDCFLAGS += -DWL_IFACE_COMB_NUM_CHANNELS
 DHDCFLAGS += -DWL_NEWCFG_PRIVCMD_SUPPORT
 # Link Statistics feature
 DHDCFLAGS += -DLINKSTAT_SUPPORT
-
-# To support GSCAN
-DHDCFLAGS += -DGSCAN_SUPPORT
-
-# To support RTT
-DHDCFLAGS += -DRTT_SUPPORT
-
 # To support WL_VENDOR_EXT_SUPPORT
 DHDCFLAGS += -DWL_VENDOR_EXT_SUPPORT
 
 # Extra file list for Lollipop
-DHD_ANDROID_OFILES := wl_cfgvendor.o dhd_rtt.o
+DHD_ANDROID_OFILES := wl_cfgvendor.o
 
 # GN4 platform still disabled Lollipop features
 ifeq ($(filter y,$(CONFIG_MACH_UNIVERSAL5433) $(CONFIG_ARCH_APQ8084)),y)
-DHD_ANDROID_OFILES :=$(filter-out wl_cfgvendor.o dhd_rtt.o,$(DHD_ANDROID_OFILES))
+DHD_ANDROID_OFILES :=$(filter-out wl_cfgvendor.o,$(DHD_ANDROID_OFILES))
 DHDCFLAGS :=$(filter-out -DLINKSTAT_SUPPORT,$(DHDCFLAGS))
-DHDCFLAGS :=$(filter-out -DGSCAN_SUPPORT,$(DHDCFLAGS))
-DHDCFLAGS :=$(filter-out -DRTT_SUPPORT,$(DHDCFLAGS))
 DHDCFLAGS :=$(filter-out -DWL_VENDOR_EXT_SUPPORT,$(DHDCFLAGS))
 endif
 
@@ -250,6 +277,8 @@ ifneq ($(CONFIG_BCM4358),)
   DHDCFLAGS += -DDHD_DONOT_FORWARD_BCMEVENT_AS_NETWORK_PKT
   DHDCFLAGS += -DCUSTOM_BCN_TIMEOUT=6
   DHDCFLAGS += -DSOFTAP_UAPSD_OFF
+# To support APF
+  DHDCFLAGS += -DAPF
 # tput enhancement for common
   DHDCFLAGS += -DUSE_WL_TXBF
   DHDCFLAGS += -DUSE_WL_FRAMEBURST
@@ -287,12 +316,16 @@ endif
 # Disabled DHDTCPACK_SUPPRESS for T Project / Enabled for Zero Project
 ifeq ($(filter y,$(CONFIG_MACH_UNIVERSAL5433) $(CONFIG_ARCH_APQ8084)),y)
   DHDCFLAGS :=$(filter-out -DDHDTCPACK_SUPPRESS,$(DHDCFLAGS))
-# For enable temperature throttling feature at BCM4358A3
-#  DHDCFLAGS += -DENABLE_TEMP_THROTTLING
 endif
 
 ifeq ($(CONFIG_ARCH_MSM),y)
   DHDCFLAGS += -DSET_RPS_CPUS
+  DHDCFLAGS := $(filter-out -DDHDTCPACK_SUPPRESS,$(DHDCFLAGS))
+endif
+
+ifeq ($(CONFIG_ARCH_MSM8996),y)
+# Enable Dongle Isolation
+  DHDCFLAGS += -DDONGLE_ENABLE_ISOLATION
 endif
 
 # New Features
@@ -588,11 +621,19 @@ ifeq ($(GGSM_WIFI_5GHz_CHANNELS),true)
   DHDCFLAGS += -DCUSTOMER_SET_COUNTRY
 endif
 
+# Compiler option for specific platform
+ifeq ($(CONFIG_ARCH_MSM8996),y)
+  DHDCFLAGS += -Wno-date-time
+endif
 
+# DTS Support
 ifeq ($(CONFIG_OF),y)
 ifneq ($(CONFIG_MACH_UNIVERSAL7420),)
 DHDCFLAGS += -DDHD_OF_SUPPORT
 DHDCFLAGS += -DBCMPCIE_OOB_HOST_WAKE
+# For enable temperature throttling feature at BCM4358A3
+# DHDCFLAGS += -DENABLE_TEMP_THROTTLING
+# DHDCFLAGS += -DTEMP_THROTTLE_CONTROL_BIT=0xD
 endif
 ifneq ($(CONFIG_MACH_UNIVERSAL5433),)
 DHDCFLAGS += -DDHD_OF_SUPPORT
@@ -606,6 +647,10 @@ DHDCFLAGS += -DDHD_OF_SUPPORT
 endif
 ifneq ($(CONFIG_ARCH_MSM8994),)
 DHDCFLAGS += -DDHD_OF_SUPPORT
+endif
+ifneq ($(CONFIG_ARCH_MSM8996),)
+DHDCFLAGS += -DDHD_OF_SUPPORT
+DHDCFLAGS += -DBCMPCIE_OOB_HOST_WAKE
 endif
 endif # CONFIG_OF
 

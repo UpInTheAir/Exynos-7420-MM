@@ -109,14 +109,11 @@ void report_sensordata(struct ssp_data *data, int sensor,
 	if (sensor == PROXIMITY_SENSOR) {
 		ssp_info("Proximity Sensor Detect : %u, raw : %u",
 			sensordata->prox, sensordata->prox_ex);
-
 	} else if (sensor == PROXIMITY_RAW) {
 		report_prox_raw_data(data, sensor, sensordata);
 		return;
-
 	} else if (sensor == LIGHT_SENSOR) {
 		sensordata->a_gain &= 0x03;
-
 #ifdef CONFIG_SENSORS_SSP_IRDATA_FOR_CAMERA
 	} else if (sensor == LIGHT_IR_SENSOR) {
 		sensordata->ir_a_gain &= 0x03;
@@ -132,7 +129,10 @@ void report_sensordata(struct ssp_data *data, int sensor,
 #endif
 	} else if (sensor == STEP_COUNTER) {
 		data->buf[sensor].step_total += sensordata->step_diff;
-
+	} else if (sensor == TILT_DETECTOR) {
+		ssp_info("report tilt detect = %u", sensordata->tilt_detector);
+	} else if (sensor == PICKUP_GESTURE) {
+		ssp_info("report pickup data = %u", sensordata->pickup_gesture);
 	} else if (sensor == SHAKE_CAM) {
 		report_shake_cam_data(data, sensordata);
 		return;

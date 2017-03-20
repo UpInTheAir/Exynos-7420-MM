@@ -241,9 +241,9 @@ void report_interrupt_gyro_data(struct ssp_data *data, struct sensor_value *gyro
 		lTemp[2] = (int)data->buf[INTERRUPT_GYRO_SENSOR].z;
 	}
 
-	input_report_rel(data->interrupt_gyro_input_dev, REL_RX, data->buf[INTERRUPT_GYRO_SENSOR].x);
-	input_report_rel(data->interrupt_gyro_input_dev, REL_RY, data->buf[INTERRUPT_GYRO_SENSOR].y);
-	input_report_rel(data->interrupt_gyro_input_dev, REL_RZ, data->buf[INTERRUPT_GYRO_SENSOR].z);
+	input_report_rel(data->interrupt_gyro_input_dev, REL_RX, lTemp[0]);
+	input_report_rel(data->interrupt_gyro_input_dev, REL_RY, lTemp[1]);
+	input_report_rel(data->interrupt_gyro_input_dev, REL_RZ, lTemp[2]);
 
 	input_sync(data->interrupt_gyro_input_dev);
 }
@@ -637,7 +637,7 @@ void report_tilt_data(struct ssp_data *data,
 	ssp_push_1bytes_buffer(data->tilt_indio_dev, tilt_data->timestamp,
 			&tilt_data->tilt_detector);
 	wake_lock_timeout(&data->ssp_wake_lock, 3 * HZ);
-	pr_err("[SSP]: %s: %d", __func__,  tilt_data->tilt_detector);
+	ssp_dbg("[SSP]: %s: %d", __func__,  tilt_data->tilt_detector);
 }
 
 void report_pickup_data(struct ssp_data *data,
@@ -647,7 +647,7 @@ void report_pickup_data(struct ssp_data *data,
 	ssp_push_1bytes_buffer(data->pickup_indio_dev, pickup_data->timestamp,
 			&pickup_data->pickup_gesture);
 	wake_lock_timeout(&data->ssp_wake_lock, 3 * HZ);
-	pr_err("[SSP]: %s: %d", __func__,  pickup_data->pickup_gesture);
+	ssp_dbg("[SSP]: %s: %d", __func__,  pickup_data->pickup_gesture);
 }
 
 void report_motor_test_data(struct ssp_data *data,

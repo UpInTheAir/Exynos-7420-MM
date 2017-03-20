@@ -314,10 +314,9 @@ struct fts_finger {
 };
 
 enum tsp_power_mode {
-	FTS_POWER_STATE_ACTIVE = 0,
+	FTS_POWER_STATE_POWERDOWN = 0,
 	FTS_POWER_STATE_LOWPOWER,
-	FTS_POWER_STATE_POWERDOWN,
-	FTS_POWER_STATE_DEEPSLEEP,
+	FTS_POWER_STATE_ACTIVE,
 };
 
 enum fts_cover_id {

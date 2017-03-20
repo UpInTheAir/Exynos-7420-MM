@@ -109,7 +109,7 @@ void ssp_dump_task(struct work_struct *work)
 	struct timeval cur_time;
 	mm_segment_t fs;
 	int buf_len, packet_len, residue;
-	int iRet = 0, index = 0, iRetTrans = 0, iRetWrite = 0;
+	int index = 0, iRetTrans = 0, iRetWrite = 0;
 
 	big = container_of(work, struct ssp_big, work);
 	ssp_errf("start ssp dumping (%d)(%d)",
@@ -136,9 +136,8 @@ void ssp_dump_task(struct work_struct *work)
 #endif
 
 		if (IS_ERR(dump_file)) {
-			ssp_errf("Can't open dump file");
+			ssp_errf("Can't open dump file(%ld)", PTR_ERR(dump_file));
 			set_fs(fs);
-			iRet = PTR_ERR(dump_file);
 			wake_unlock(&big->data->ssp_wake_lock);
 			kfree(big);
 			return;
@@ -309,97 +308,123 @@ static void print_sensordata(struct ssp_data *data, unsigned int uSensor)
 	switch (uSensor) {
 	case ACCELEROMETER_SENSOR:
 	case GYROSCOPE_SENSOR:
-		ssp_info("%u : %d, %d, %d (%ums, %dms)", uSensor,
+		ssp_info("%u : %d, %d, %d (%ums, %dms) - %llu", uSensor,
 			data->buf[uSensor].x, data->buf[uSensor].y,
 			data->buf[uSensor].z,
 			get_msdelay(data->adDelayBuf[uSensor]),
-			data->batchLatencyBuf[uSensor]);
+			data->batchLatencyBuf[uSensor],
+			data->lastTimestamp[uSensor]);
 		break;
 	case GEOMAGNETIC_SENSOR:
-		ssp_info("%u : %d, %d, %d, %d (%ums)", uSensor,
+		ssp_info("%u : %d, %d, %d, %d (%ums) - %llu", uSensor,
 			data->buf[uSensor].cal_x, data->buf[uSensor].cal_y,
 			data->buf[uSensor].cal_y, data->buf[uSensor].accuracy,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case GEOMAGNETIC_UNCALIB_SENSOR:
-		ssp_info("%u : %d, %d, %d, %d, %d, %d (%ums)", uSensor,
+		ssp_info("%u : %d, %d, %d, %d, %d, %d (%ums) - %llu", uSensor,
 			data->buf[uSensor].uncal_x, data->buf[uSensor].uncal_y,
 			data->buf[uSensor].uncal_z, data->buf[uSensor].offset_x,
 			data->buf[uSensor].offset_y, data->buf[uSensor].offset_z,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case PRESSURE_SENSOR:
-		ssp_info("%u : %d, %d (%ums, %dms)", uSensor,
+		ssp_info("%u : %d, %d (%ums, %dms) - %llu", uSensor,
 			data->buf[uSensor].pressure,
 			data->buf[uSensor].temperature,
 			get_msdelay(data->adDelayBuf[uSensor]),
-			data->batchLatencyBuf[uSensor]);
+			data->batchLatencyBuf[uSensor],
+			data->lastTimestamp[uSensor]);
 		break;
 	case GESTURE_SENSOR:
-		ssp_info("%u : %d, %d, %d, %d (%ums)", uSensor,
+		ssp_info("%u : %d, %d, %d, %d (%ums) - %llu", uSensor,
 			data->buf[uSensor].data[3], data->buf[uSensor].data[4],
 			data->buf[uSensor].data[5], data->buf[uSensor].data[6],
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case LIGHT_SENSOR:
-		ssp_info("%u : %u, %u, %u, %u, %u, %u (%ums)", uSensor,
+		ssp_info("%u : %u, %u, %u, %u, %u, %u (%ums) - %llu", uSensor,
 			data->buf[uSensor].r, data->buf[uSensor].g,
 			data->buf[uSensor].b, data->buf[uSensor].w,
 			data->buf[uSensor].a_time, data->buf[uSensor].a_gain,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case PROXIMITY_SENSOR:
-		ssp_info("%u : %d, %d (%ums)", uSensor,
+		ssp_info("%u : %d, %d (%ums) - %llu", uSensor,
 			data->buf[uSensor].prox, data->buf[uSensor].prox_ex,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case STEP_DETECTOR:
-		ssp_info("%u : %u (%ums, %dms)", uSensor,
+		ssp_info("%u : %u (%ums, %dms) - %llu", uSensor,
 			data->buf[uSensor].step_det,
 			get_msdelay(data->adDelayBuf[uSensor]),
-			data->batchLatencyBuf[uSensor]);
+			data->batchLatencyBuf[uSensor],
+			data->lastTimestamp[uSensor]);
 		break;
 	case GAME_ROTATION_VECTOR:
 	case ROTATION_VECTOR:
-		ssp_info("%u : %d, %d, %d, %d, %d (%ums, %dms)", uSensor,
+		ssp_info("%u : %d, %d, %d, %d, %d (%ums, %dms) - %llu", uSensor,
 			data->buf[uSensor].quat_a, data->buf[uSensor].quat_b,
 			data->buf[uSensor].quat_c, data->buf[uSensor].quat_d,
 			data->buf[uSensor].acc_rot,
 			get_msdelay(data->adDelayBuf[uSensor]),
-			data->batchLatencyBuf[uSensor]);
+			data->batchLatencyBuf[uSensor],
+			data->lastTimestamp[uSensor]);
 		break;
 	case SIG_MOTION_SENSOR:
-		ssp_info("%u : %u(%ums)", uSensor,
+		ssp_info("%u : %u(%ums) - %llu", uSensor,
 			data->buf[uSensor].sig_motion,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case GYRO_UNCALIB_SENSOR:
-		ssp_info("%u : %d, %d, %d, %d, %d, %d (%ums)", uSensor,
+		ssp_info("%u : %d, %d, %d, %d, %d, %d (%ums) - %llu", uSensor,
 			data->buf[uSensor].uncal_x, data->buf[uSensor].uncal_y,
 			data->buf[uSensor].uncal_z, data->buf[uSensor].offset_x,
 			data->buf[uSensor].offset_y,
 			data->buf[uSensor].offset_z,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case STEP_COUNTER:
-		ssp_info("%u : %u(%ums)", uSensor,
+		ssp_info("%u : %u(%ums) - %llu", uSensor,
 			data->buf[uSensor].step_diff,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case LIGHT_IR_SENSOR:
-		ssp_info("%u : %u, %u, %u, %u, %u, %u, %u(%ums)", uSensor,
+		ssp_info("%u : %u, %u, %u, %u, %u, %u, %u(%ums) - %llu", uSensor,
 			data->buf[uSensor].irdata,
 			data->buf[uSensor].ir_r, data->buf[uSensor].ir_g,
 			data->buf[uSensor].ir_b, data->buf[uSensor].ir_w,
 			data->buf[uSensor].ir_a_time,
 			data->buf[uSensor].ir_a_gain,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	case INTERRUPT_GYRO_SENSOR:
-		ssp_info("%u : %d, %d, %d (%ums)", uSensor,
+		ssp_info("%u : %d, %d, %d (%ums) - %llu", uSensor,
 			data->buf[uSensor].x, data->buf[uSensor].y,
 			data->buf[uSensor].z,
-			get_msdelay(data->adDelayBuf[uSensor]));
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
+		break;
+	case TILT_DETECTOR:
+		ssp_info("%u : %u(%ums) - %llu", uSensor,
+			data->buf[uSensor].tilt_detector,
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
+		break;
+	case PICKUP_GESTURE:
+		ssp_info("%u : %u(%ums) - %llu", uSensor,
+			data->buf[uSensor].pickup_gesture,
+			get_msdelay(data->adDelayBuf[uSensor]),
+			data->lastTimestamp[uSensor]);
 		break;
 	default:
 		ssp_info("Wrong sensorCnt: %u", uSensor);
@@ -409,16 +434,44 @@ static void print_sensordata(struct ssp_data *data, unsigned int uSensor)
 
 static void recovery_mcu(struct ssp_data *data)
 {
-	if (data->uComFailCnt < LIMIT_RESET_CNT) {
-		ssp_infof("- uTimeOutCnt(%u), pending(%u)",
-			data->uTimeOutCnt, !list_empty(&data->pending_list));
-		data->uComFailCnt++;
-		reset_mcu(data);
-	} else {
-		ssp_enable(data, false);
+	ssp_infof("- uTimeOutCnt(%u), pending(%u)",
+		data->uTimeOutCnt, !list_empty(&data->pending_list));
+		
+	data->uComFailCnt++;
+	reset_mcu(data);
+	
+	data->uTimeOutCnt = 0;
+}
+
+/*
+	check_sensor_event
+	- return 
+		true : there is no accel or light sensor event over 5sec when sensor is registered
+*/
+bool check_wait_event(struct ssp_data *data)
+{
+	u64 timestamp = get_current_timestamp();
+	int check_sensors[2] = {ACCELEROMETER_SENSOR, LIGHT_SENSOR};
+	int i, sensor; 
+	bool res = false;
+	
+	for(i = 0 ; i < 2 ; i++)
+	{
+		sensor = check_sensors[i];
+		//the sensor is registered
+		if((atomic64_read(&data->aSensorEnable) & (1 << sensor))
+			//non batching mode
+			&& data->IsBypassMode[sensor] == 1
+			//there is no sensor event over 5sec
+			&& data->LastSensorTimeforReset[sensor] + 5000000000ULL < timestamp)
+		{
+			ssp_info("%s - sensor(%d) last = %lld, cur = %lld",
+				__func__,sensor,data->LastSensorTimeforReset[sensor],timestamp);
+			res = true;
+		}
 	}
 
-	data->uTimeOutCnt = 0;
+	return res;
 }
 
 static void debug_work_func(struct work_struct *work)
@@ -448,7 +501,8 @@ static void debug_work_func(struct work_struct *work)
 	if (((atomic64_read(&data->aSensorEnable) & (1 << ACCELEROMETER_SENSOR))
 		&& (data->batchLatencyBuf[ACCELEROMETER_SENSOR] == 0)
 		&& (data->uIrqCnt == 0) && (data->uTimeOutCnt > 0))
-		|| (data->uTimeOutCnt > LIMIT_TIMEOUT_CNT))
+		|| (data->uTimeOutCnt > LIMIT_TIMEOUT_CNT)
+		|| (check_wait_event(data)))
 		recovery_mcu(data);
 
 	data->uIrqCnt = 0;

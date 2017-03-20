@@ -1,5 +1,6 @@
 obj-$(CONFIG_BATTERY_SAMSUNG)	+= sec_battery.o
 obj-$(CONFIG_OF)		+= sec_adc.o
+obj-$(CONFIG_BATTERY_CISD)	+= sec_cisd.o
 obj-$(CONFIG_FUELGAUGE_MAX17042)	+= max17042_fuelgauge.o sec_fuelgauge.o
 obj-$(CONFIG_FUELGAUGE_MAX17048)	+= max17048_fuelgauge.o sec_fuelgauge.o
 obj-$(CONFIG_FUELGAUGE_MAX17050)	+= max17050_fuelgauge.o sec_fuelgauge.o

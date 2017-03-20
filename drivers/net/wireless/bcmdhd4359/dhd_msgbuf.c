@@ -3,7 +3,7 @@
  * Provides type definitions and function prototypes used to link the
  * DHD OS, bus, and protocol modules.
  *
- * Copyright (C) 1999-2016, Broadcom Corporation
+ * Copyright (C) 1999-2017, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -26,7 +26,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_msgbuf.c 610535 2016-01-07 06:45:24Z $
+ * $Id: dhd_msgbuf.c 682620 2017-02-02 13:30:26Z $
  */
 
 
@@ -1062,7 +1062,7 @@ static INLINE uint32 dhd_pktid_map_avail_cnt(dhd_pktid_map_handle_t *handle);
 
 /* Allocate a unique pktid against which a pkt and some metadata is saved */
 static INLINE uint32 dhd_pktid_map_reserve(dhd_pub_t *dhd, dhd_pktid_map_handle_t *handle,
-	void *pkt);
+	void *pkt, dhd_pkttype_t pkttype);
 static INLINE void dhd_pktid_map_save(dhd_pub_t *dhd, dhd_pktid_map_handle_t *handle,
 	void *pkt, uint32 nkey, dmaaddr_t pa, uint32 len, uint8 dma,
 	void *dmah, void *secdma, dhd_pkttype_t pkttype);
@@ -1202,7 +1202,8 @@ typedef struct dhd_pktid_map {
 #define DHD_NATIVE_TO_PKTID_FINI_IOCTL(dhd, map)  dhd_pktid_map_fini_ioctl((dhd), (map))
 
 /* Convert a packet to a pktid, and save pkt pointer in busy locker */
-#define DHD_NATIVE_TO_PKTID_RSV(dhd, map, pkt)    dhd_pktid_map_reserve((dhd), (map), (pkt))
+#define DHD_NATIVE_TO_PKTID_RSV(dhd, map, pkt, pkttype)	\
+	dhd_pktid_map_reserve((dhd), (map), (pkt), (pkttype))
 
 /* Reuse a previously reserved locker to save packet params */
 #define DHD_NATIVE_TO_PKTID_SAVE(dhd, map, pkt, nkey, pa, len, dir, dmah, secdma, pkttype) \
@@ -1649,7 +1650,8 @@ dhd_pktid_map_avail_cnt(dhd_pktid_map_handle_t *handle)
  */
 
 static INLINE uint32
-__dhd_pktid_map_reserve(dhd_pub_t *dhd, dhd_pktid_map_handle_t *handle, void *pkt)
+__dhd_pktid_map_reserve(dhd_pub_t *dhd, dhd_pktid_map_handle_t *handle, void *pkt,
+	dhd_pkttype_t pkttype)
 {
 	uint32 nkey;
 	dhd_pktid_map_t *map;
@@ -1666,6 +1668,16 @@ __dhd_pktid_map_reserve(dhd_pub_t *dhd, dhd_pktid_map_handle_t *handle, void *pk
 
 	ASSERT(map->avail <= map->items);
 	nkey = map->keys[map->avail]; /* fetch a free locker, pop stack */
+
+	if ((map->avail > map->items) || (nkey > map->items)) {
+		map->failures++;
+		DHD_ERROR(("%s:%d: failed to allocate a new pktid,"
+			" map->avail<%u>, nkey<%u>, pkttype<%u>\n",
+			__FUNCTION__, __LINE__, map->avail, nkey,
+			pkttype));
+		return DHD_PKTID_INVALID; /* failed alloc request */
+	}
+
 	locker = &map->lockers[nkey]; /* save packet metadata in locker */
 	map->avail--;
 	locker->pkt = pkt; /* pkt is saved, other params not yet saved. */
@@ -1688,7 +1700,8 @@ __dhd_pktid_map_reserve(dhd_pub_t *dhd, dhd_pktid_map_handle_t *handle, void *pk
  * Wrapper that takes the required lock when called directly.
  */
 static INLINE uint32
-dhd_pktid_map_reserve(dhd_pub_t *dhd, dhd_pktid_map_handle_t *handle, void *pkt)
+dhd_pktid_map_reserve(dhd_pub_t *dhd, dhd_pktid_map_handle_t *handle,
+	void *pkt, dhd_pkttype_t pkttype)
 {
 	dhd_pktid_map_t *map;
 	uint32 flags;
@@ -1697,7 +1710,7 @@ dhd_pktid_map_reserve(dhd_pub_t *dhd, dhd_pktid_map_handle_t *handle, void *pkt)
 	ASSERT(handle != NULL);
 	map = (dhd_pktid_map_t *)handle;
 	flags = DHD_PKTID_LOCK(map->pktid_lock);
-	ret = __dhd_pktid_map_reserve(dhd, handle, pkt);
+	ret = __dhd_pktid_map_reserve(dhd, handle, pkt, pkttype);
 	DHD_PKTID_UNLOCK(map->pktid_lock, flags);
 
 	return ret;
@@ -1715,6 +1728,12 @@ __dhd_pktid_map_save(dhd_pub_t *dhd, dhd_pktid_map_handle_t *handle, void *pkt,
 	map = (dhd_pktid_map_t *)handle;
 
 	ASSERT((nkey != DHD_PKTID_INVALID) && (nkey <= DHD_PKIDMAP_ITEMS(map->items)));
+
+	if ((nkey == DHD_PKTID_INVALID) || (nkey > DHD_PKIDMAP_ITEMS(map->items))) {
+		DHD_ERROR(("%s:%d: Error! saving invalid pktid<%u> pkttype<%u>\n",
+			__FUNCTION__, __LINE__, nkey, pkttype));
+		return;
+	}
 
 	locker = &map->lockers[nkey];
 
@@ -1775,7 +1794,7 @@ dhd_pktid_map_alloc(dhd_pub_t *dhd, dhd_pktid_map_handle_t *handle, void *pkt,
 
 	flags = DHD_PKTID_LOCK(map->pktid_lock);
 
-	nkey = __dhd_pktid_map_reserve(dhd, handle, pkt);
+	nkey = __dhd_pktid_map_reserve(dhd, handle, pkt, pkttype);
 	if (nkey != DHD_PKTID_INVALID) {
 		__dhd_pktid_map_save(dhd, handle, pkt, nkey, pa,
 			len, dir, dmah, secdma, pkttype);
@@ -1804,6 +1823,7 @@ dhd_pktid_map_free(dhd_pub_t *dhd, dhd_pktid_map_handle_t *handle, uint32 nkey,
 	dhd_pktid_item_t *locker;
 	void * pkt;
 	uint32 flags;
+	unsigned long locker_addr;
 
 	ASSERT(handle != NULL);
 
@@ -1812,6 +1832,12 @@ dhd_pktid_map_free(dhd_pub_t *dhd, dhd_pktid_map_handle_t *handle, uint32 nkey,
 	flags = DHD_PKTID_LOCK(map->pktid_lock);
 
 	ASSERT((nkey != DHD_PKTID_INVALID) && (nkey <= DHD_PKIDMAP_ITEMS(map->items)));
+
+	if ((nkey == DHD_PKTID_INVALID) && (nkey > DHD_PKIDMAP_ITEMS(map->items))) {
+		DHD_ERROR(("%s:%d: Error! Try to free invalid pktid<%u>, pkttype<%d>\n",
+		           __FUNCTION__, __LINE__, nkey, pkttype));
+		return NULL;
+	}
 
 	locker = &map->lockers[nkey];
 
@@ -1838,6 +1864,16 @@ dhd_pktid_map_free(dhd_pub_t *dhd, dhd_pktid_map_handle_t *handle, uint32 nkey,
 
 		DHD_ERROR(("%s:%d: Error! Invalid Buffer Free for pktid<%u> \n",
 			__FUNCTION__, __LINE__, nkey));
+#ifdef BCMDMA64OSL
+		PHYSADDRTOULONG(locker->pa, locker_addr);
+#else
+		locker_addr = PHYSADDRLO(locker->pa);
+#endif /* BCMDMA64OSL */
+		DHD_ERROR(("%s:%d: locker->state <%d>, locker->pkttype <%d>,"
+			"pkttype <%d> locker->pa <0x%lx> \n",
+			__FUNCTION__, __LINE__, locker->state, locker->pkttype,
+			pkttype, locker_addr));
+
 		ASSERT(locker->pkttype == pkttype);
 
 		return NULL;
@@ -2037,7 +2073,7 @@ dhd_pktid_to_native(dhd_pktid_map_handle_t *map, uint32 pktid32,
 	return pktptr32;
 }
 
-#define DHD_NATIVE_TO_PKTID_RSV(dhd, map, pkt)  DHD_PKTID32(pkt)
+#define DHD_NATIVE_TO_PKTID_RSV(dhd, map, pkt, pkttype)  DHD_PKTID32(pkt)
 
 #define DHD_NATIVE_TO_PKTID_SAVE(dhd, map, pkt, nkey, pa, len, dma_dir, dmah, secdma, pkttype) \
 	({ BCM_REFERENCE(dhd); BCM_REFERENCE(nkey); BCM_REFERENCE(dma_dir); \
@@ -2560,12 +2596,8 @@ dhd_sync_with_dongle(dhd_pub_t *dhd)
 		revinfo.deviceid, revinfo.vendorid, revinfo.chipnum));
 
 	dhd_process_cid_mac(dhd, TRUE);
-
 	ret = dhd_preinit_ioctls(dhd);
-
-	if (!ret) {
-		dhd_process_cid_mac(dhd, FALSE);
-	}
+	dhd_process_cid_mac(dhd, FALSE);
 
 	/* Always assumes wl for now */
 	dhd->iswl = TRUE;
@@ -3786,7 +3818,7 @@ dhd_prot_txstatus_process(dhd_pub_t *dhd, void *msg)
 
 		/* Release the Lock when no more tx packets are pending */
 		if (prot->active_tx_count == 0)
-			 DHD_OS_WAKE_UNLOCK(dhd);
+			 DHD_TXFL_WAKE_UNLOCK(dhd);
 
 	} else {
 		DHD_ERROR(("Extra packets are freed\n"));
@@ -4098,7 +4130,8 @@ dhd_prot_txdata(dhd_pub_t *dhd, void *PKTBUF, uint8 ifidx)
 	DHD_GENERAL_LOCK(dhd, flags);
 
 	/* Create a unique 32-bit packet id */
-	pktid = DHD_NATIVE_TO_PKTID_RSV(dhd, dhd->prot->pktid_map_handle, PKTBUF);
+	pktid = DHD_NATIVE_TO_PKTID_RSV(dhd, dhd->prot->pktid_map_handle,
+		PKTBUF, PKTTYPE_DATA_TX);
 #if defined(DHD_PCIE_PKTID)
 	if (pktid == DHD_PKTID_INVALID) {
 		DHD_ERROR(("Pktid pool depleted.\n"));
@@ -4259,7 +4292,7 @@ dhd_prot_txdata(dhd_pub_t *dhd, void *PKTBUF, uint8 ifidx)
 	 * to finish.
 	 */
 	if (prot->active_tx_count == 1)
-		DHD_OS_WAKE_LOCK(dhd);
+		DHD_TXFL_WAKE_LOCK(dhd);
 
 	DHD_GENERAL_UNLOCK(dhd, flags);
 
@@ -4654,20 +4687,33 @@ static int
 dhd_msgbuf_query_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len, uint8 action)
 {
 	int ret = 0;
+	uint copylen = 0;
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
-	/* Respond "bcmerror" and "bcmerrorstr" with local cache */
 	if (cmd == WLC_GET_VAR && buf)
 	{
-		if (!strcmp((char *)buf, "bcmerrorstr"))
-		{
-			strncpy((char *)buf, bcmerrorstr(dhd->dongle_error), BCME_STRLEN);
+		if (!len || !*(uint8 *)buf) {
+			DHD_ERROR(("%s(): Zero length bailing\n", __FUNCTION__));
+			ret = BCME_BADARG;
 			goto done;
 		}
-		else if (!strcmp((char *)buf, "bcmerror"))
-		{
-			*(int *)buf = dhd->dongle_error;
+
+		/* Respond "bcmerror" and "bcmerrorstr" with local cache */
+		copylen = MIN(len, BCME_STRLEN);
+
+		if ((len >= strlen("bcmerrorstr")) &&
+			(!strcmp((char *)buf, "bcmerrorstr"))) {
+
+			strncpy((char *)buf, bcmerrorstr(dhd->dongle_error), copylen);
+			*(uint8 *)((uint8 *)buf + (copylen - 1)) = '\0';
+
+			goto done;
+		} else if ((len >= strlen("bcmerror")) &&
+			!strcmp((char *)buf, "bcmerror")) {
+
+			*(uint32 *)(uint32 *)buf = dhd->dongle_error;
+
 			goto done;
 		}
 	}
@@ -4698,7 +4744,7 @@ dhd_msgbuf_wait_ioctl_cmplt(dhd_pub_t *dhd, uint32 len, void *buf)
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
-	if (dhd->dongle_reset) {
+	if (dhd_query_bus_erros(dhd)) {
 		ret = -EIO;
 		goto out;
 	}
@@ -4713,6 +4759,7 @@ dhd_msgbuf_wait_ioctl_cmplt(dhd_pub_t *dhd, uint32 len, void *buf)
 	if (timeleft == 0) {
 		dhd->rxcnt_timeout++;
 		dhd->rx_ctlerrs++;
+		dhd->iovar_timeout_occured = TRUE;
 		DHD_ERROR(("%s: resumed on timeout rxcnt_timeout %d ioctl_cmd %d "
 			"trans_id %d state %d busstate=%d ioctl_received=%d\n",
 			__FUNCTION__, dhd->rxcnt_timeout, prot->curr_ioctl_cmd,
@@ -4722,8 +4769,8 @@ dhd_msgbuf_wait_ioctl_cmplt(dhd_pub_t *dhd, uint32 len, void *buf)
 		dhd_prot_debug_info_print(dhd);
 
 #ifdef DHD_FW_COREDUMP
-		/* As soon as FW TRAP occurs, FW dump will be collected from dhdpcie_checkdied */
-		if (dhd->memdump_enabled && !dhd->dongle_trap_occured) {
+		/* Collect socram dump */
+		if (dhd->memdump_enabled) {
 			/* collect core dump */
 			dhd->memdump_type = DUMP_TYPE_RESUMED_ON_TIMEOUT;
 			dhd_bus_mem_dump(dhd);
@@ -4735,7 +4782,7 @@ dhd_msgbuf_wait_ioctl_cmplt(dhd_pub_t *dhd, uint32 len, void *buf)
 			dhd->bus->no_cfg_restore = 1;
 #endif /* CONFIG_ARCH_MSM */
 #endif /* SUPPORT_LINKDOWN_RECOVERY */
-			DHD_ERROR(("%s: timeout > MAX_CNTL_TX_TIMEOUT\n", __FUNCTION__));
+			DHD_ERROR(("%s: timeout > MAX_CNTL_RX_TIMEOUT\n", __FUNCTION__));
 		}
 		ret = -ETIMEDOUT;
 		goto out;
@@ -4750,17 +4797,6 @@ dhd_msgbuf_wait_ioctl_cmplt(dhd_pub_t *dhd, uint32 len, void *buf)
 		dhd->rx_ctlpkts++;
 		DHD_CTL(("%s: ioctl resp resumed, got %d\n",
 			__FUNCTION__, prot->ioctl_resplen));
-	}
-
-	if (dhd->dongle_trap_occured) {
-#ifdef SUPPORT_LINKDOWN_RECOVERY
-#ifdef CONFIG_ARCH_MSM
-		dhd->bus->no_cfg_restore = 1;
-#endif /* CONFIG_ARCH_MSM */
-#endif /* SUPPORT_LINKDOWN_RECOVERY */
-		DHD_ERROR(("%s: TRAP occurred!!\n", __FUNCTION__));
-		ret = -EREMOTEIO;
-		goto out;
 	}
 
 	if (dhd->prot->ioctl_resplen > len) {
@@ -4948,6 +4984,10 @@ dhd_fillup_ioct_reqst(dhd_pub_t *dhd, uint16 len, uint cmd, void* buf, int ifidx
 	unsigned long flags;
 	uint16 alloced = 0;
 	msgbuf_ring_t *ring = &prot->h2dring_ctrl_subn;
+
+	if (dhd_query_bus_erros(dhd)) {
+		return -EIO;
+	}
 
 	rqstlen = len;
 	resplen = len;
@@ -5972,19 +6012,24 @@ void dhd_prot_print_flow_ring(dhd_pub_t *dhd, void *msgbuf_flow_info,
 void dhd_prot_print_info(dhd_pub_t *dhd, struct bcmstrbuf *strbuf)
 {
 	dhd_prot_t *prot = dhd->prot;
-	bcm_bprintf(strbuf, "CtrlPost: ");
-	dhd_prot_print_flow_ring(dhd, &prot->h2dring_ctrl_subn, strbuf, NULL);
-	bcm_bprintf(strbuf, "CtrlCpl: ");
-	dhd_prot_print_flow_ring(dhd, &prot->d2hring_ctrl_cpln, strbuf, NULL);
-
-	bcm_bprintf(strbuf, "RxPost: ");
-	bcm_bprintf(strbuf, "RBP %d ", prot->rxbufpost);
-	dhd_prot_print_flow_ring(dhd, &prot->h2dring_rxp_subn, strbuf, NULL);
-	bcm_bprintf(strbuf, "RxCpl: ");
-	dhd_prot_print_flow_ring(dhd, &prot->d2hring_rx_cpln, strbuf, NULL);
-
-	bcm_bprintf(strbuf, "TxCpl: ");
-	dhd_prot_print_flow_ring(dhd, &prot->d2hring_tx_cpln, strbuf, NULL);
+	bcm_bprintf(strbuf,
+		"%8s %4s %4s %5s %17s %17s %7s\n",
+		"Type", "RBP", "RD", "WR", "BASE(VA)", "BASE(PA)", "SIZE");
+	bcm_bprintf(strbuf, "%8s %4s", "CtrlPost", "NA");
+	dhd_prot_print_flow_ring(dhd, &prot->h2dring_ctrl_subn, strbuf,
+		"%5d %5d %17p %8x:%8x %7d\n");
+	bcm_bprintf(strbuf, "%8s %4s", "CtrlCpl", "NA");
+	dhd_prot_print_flow_ring(dhd, &prot->d2hring_ctrl_cpln, strbuf,
+		"%5d %5d %17p %8x:%8x %7d\n");
+	bcm_bprintf(strbuf, "%8s %4d", "RxPost", prot->rxbufpost);
+	dhd_prot_print_flow_ring(dhd, &prot->h2dring_rxp_subn, strbuf,
+		 "%5d %5d %17p %8x:%8x %7d\n");
+	bcm_bprintf(strbuf, "%8s %4s", "RxCpl", "NA");
+	dhd_prot_print_flow_ring(dhd, &prot->d2hring_rx_cpln, strbuf,
+		"%5d %5d %17p %8x:%8x %7d\n");
+	bcm_bprintf(strbuf, "%8s %4s", "TxCpl", "NA");
+	dhd_prot_print_flow_ring(dhd, &prot->d2hring_tx_cpln, strbuf,
+		"%5d %5d %17p %8x:%8x %7d\n");
 	bcm_bprintf(strbuf, "active_tx_count %d	 pktidmap_avail %d\n",
 		dhd->prot->active_tx_count,
 		DHD_PKTID_AVAIL(dhd->prot->pktid_map_handle));
@@ -6184,6 +6229,72 @@ dhd_prot_d2h_ring_config_cmplt_process(dhd_pub_t *dhd, void *msg)
 		ltoh16(((ring_config_resp_t *)msg)->compl_hdr.flow_ring_id)));
 }
 
+static inline uint32
+dhd_pcie_config_read(osl_t *osh, uint offset, uint size)
+{
+	OSL_DELAY(100);
+	return OSL_PCI_READ_CONFIG(osh, offset, size);
+}
+
+static inline uint32
+dhd_pcie_corereg_read(si_t *sih, uint val)
+{
+	OSL_DELAY(100);
+	si_corereg(sih, sih->buscoreidx, OFFSETOF(sbpcieregs_t, configaddr), ~0, val);
+	return si_corereg(sih, sih->buscoreidx, OFFSETOF(sbpcieregs_t, configdata), 0, 0);
+}
+
+int
+dhd_prot_debug_dma_info_print(dhd_pub_t *dhd)
+{
+
+	DHD_ERROR(("\n ------- DUMPING DMA Registers ------- \r\n"));
+
+	//HostToDev
+	DHD_ERROR(("HostToDev TX: XmtCtrl=0x%08x XmtPtr=0x%08x\n",
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x200, 0, 0),
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x204, 0, 0)));
+	DHD_ERROR(("            : XmtAddrLow=0x%08x XmtAddrHigh=0x%08x\n",
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x208, 0, 0),
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x20C, 0, 0)));
+	DHD_ERROR(("            : XmtStatus0=0x%08x XmtStatus1=0x%08x\n",
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x210, 0, 0),
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x214, 0, 0)));
+
+	DHD_ERROR(("HostToDev RX: RcvCtrl=0x%08x RcvPtr=0x%08x\n",
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x220, 0, 0),
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x224, 0, 0)));
+	DHD_ERROR(("            : RcvAddrLow=0x%08x RcvAddrHigh=0x%08x\n",
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x228, 0, 0),
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x22C, 0, 0)));
+	DHD_ERROR(("            : RcvStatus0=0x%08x RcvStatus1=0x%08x\n",
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x230, 0, 0),
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x234, 0, 0)));
+
+	//DevToHost
+	DHD_ERROR(("DevToHost TX: XmtCtrl=0x%08x XmtPtr=0x%08x\n",
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x240, 0, 0),
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x244, 0, 0)));
+	DHD_ERROR(("            : XmtAddrLow=0x%08x XmtAddrHigh=0x%08x\n",
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x248, 0, 0),
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x24C, 0, 0)));
+	DHD_ERROR(("            : XmtStatus0=0x%08x XmtStatus1=0x%08x\n",
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x250, 0, 0),
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x254, 0, 0)));
+
+	DHD_ERROR(("DevToHost RX: RcvCtrl=0x%08x RcvPtr=0x%08x\n",
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x260, 0, 0),
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x264, 0, 0)));
+	DHD_ERROR(("            : RcvAddrLow=0x%08x RcvAddrHigh=0x%08x\n",
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x268, 0, 0),
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x26C, 0, 0)));
+	DHD_ERROR(("            : RcvStatus0=0x%08x RcvStatus1=0x%08x\n",
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x270, 0, 0),
+		si_corereg(dhd->bus->sih, dhd->bus->sih->buscoreidx, 0x274, 0, 0)));
+
+	return 0;
+}
+
 int
 dhd_prot_debug_info_print(dhd_pub_t *dhd)
 {
@@ -6228,6 +6339,25 @@ dhd_prot_debug_info_print(dhd_pub_t *dhd)
 	DHD_ERROR(("intstatus=0x%x intmask=0x%x mbintstatus=0x%x\n,",
 		intstatus, intmask, mbintstatus));
 	DHD_ERROR(("d2h_mb_data=0x%x def_intmask=0x%x \r\n", d2h_mb_data, dhd->bus->def_intmask));
+
+
+	DHD_ERROR(("\n ------- DUMPING PCIE Registers ------- \r\n"));
+	/* hwnbu-twiki.sj.broadcom.com/bin/view/Mwgroup/CurrentPcieGen2ProgramGuide */
+	DHD_ERROR(("Command=0x%x,\n",
+		dhd_pcie_config_read(dhd->bus->osh, PCIECFGREG_STATUS_CMD, sizeof(uint32))));
+	DHD_ERROR(("LinkCtl=0x%x DeviceStatusControl2=0x%x L1SSControl=0x%x\n",
+		dhd_pcie_config_read(dhd->bus->osh, PCIECFGREG_LINK_STATUS_CTRL, sizeof(uint32)),
+		dhd_pcie_config_read(dhd->bus->osh, PCIECFGGEN_DEV_STATUS_CTRL2, sizeof(uint32)),
+		dhd_pcie_config_read(dhd->bus->osh, PCIECFGREG_PML1_SUB_CTRL1, sizeof(uint32))));
+
+	/* hwnbu-twiki.sj.broadcom.com/twiki/pub/Mwgroup/CurrentPcieGen2ProgramGuide/pcie_ep.htm */
+	DHD_ERROR(("ClkReq0=0x%x ClkReq1=0x%x ClkReq2=0x%x ClkReq3=0x%x\n",
+		dhd_pcie_corereg_read(dhd->bus->sih, PCIECFGREG_PHY_DBG_CLKREQ0),
+		dhd_pcie_corereg_read(dhd->bus->sih, PCIECFGREG_PHY_DBG_CLKREQ1),
+		dhd_pcie_corereg_read(dhd->bus->sih, PCIECFGREG_PHY_DBG_CLKREQ2),
+		dhd_pcie_corereg_read(dhd->bus->sih, PCIECFGREG_PHY_DBG_CLKREQ3)));
+
+	dhd_prot_debug_dma_info_print(dhd);
 
 	return 0;
 }
